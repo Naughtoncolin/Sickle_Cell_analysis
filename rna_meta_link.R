@@ -1,6 +1,7 @@
+setwd("C:/Users/Naugh/Dropbox (GaTech)/Gibson/Working/SickleCell/metadata/RNA/")
+
 library(dplyr)
 library(tidyr)
-library(xlsx)
 library(purrr)
 
 # Read in file of lab measurements
@@ -21,48 +22,130 @@ metadata$`TOR ID_1` <- ifelse(metadata$`TOR ID_1` == "NA", NA, metadata$`TOR ID_
 na_rows <- which(is.na(metadata[,2]) & is.na(metadata[,3]) & is.na(metadata[,4]))
 metadata <- filter(metadata, !(row_number() %in% na_rows))
 
-metadata<- unique(metadata)
+# Identify rows with an NA value for whatever value was trying to be measured & drop them.
+na_values <- which(is.na(metadata$ORD_VALUE))
+metadata <- filter(metadata, !(row_number() %in% na_values))
+
 #metadata <- unique(metadata[,c("TOR ID_1", "COMPONENT_NAME", "ORD_VALUE", "ORDERING_DATE")])
 #Remove "CULTURE SOURCE" measurement due to repeat values.
 metadata <- metadata[which(metadata$COMPONENT_NAME!="CULTURE SOURCE"),]
 
-# Trying to use the spread function threw errors for these rows, for example if a patient on the same date had 2 different blood type results
-duplicate.rows <- c(109541, 109564, 128672, 128673, 180823, 180837, 180822, 180834, 180821, 180833, 195919, 195921, 195923, 195925, 195926, 195928, 195932, 195934, 195935, 209319, 209321, 209323, 209325, 209335, 209326, 209328, 209330, 209332, 209333, 109540, 109563, 109549, 109562, 9657, 9662, 19929, 19940, 14776, 14783, 14831, 14835, 55883, 55891, 60153, 60158, 60161, 93419, 93426, 110441, 110447, 125194, 125200, 125254, 125259, 125380, 125385, 176921, 176927, 177094, 177100, 177117, 177119, 177126, 177130, 177382, 177388, 201637, 201645, 201647, 215334, 215338, 215339, 215341, 215342, 215398, 215404, 215407, 215526, 215532, 259617, 259619, 14727, 14732, 14778, 14785, 14829, 14834, 14884, 14886, 45517, 45525, 45573, 45575, 45622, 45625, 55800, 55804, 55885, 55894, 93416, 93425, 93547, 93555, 108568, 108574, 108653, 108656, 110443, 110448, 110457, 110460, 125199, 125202, 125256, 125258, 201422, 201424, 201639, 201644, 215254, 215258, 215400, 215403, 215469, 215473, 259621, 259626, 60157, 60160, 60162, 110452, 110458, 176923, 176929, 177099, 177101, 177114, 177120, 177122, 177129, 177384, 177390, 201633, 201641, 201646, 215330, 215336, 215340, 215394, 215402, 215406, 93409, 93411, 180820, 180832, 19926, 19938, 19896, 19911, 14723, 14730, 55797, 55802, 55881, 55889, 14726, 14731, 55793, 55801, 55886, 55892, 14722, 14729, 14775, 14782, 14832, 14836, 14883, 14885, 45522, 45523, 45526, 45527, 45571, 45576, 45624, 45626, 55798, 55803, 55882, 55890, 93420, 93427, 93553, 93556, 93605, 93610, 108573, 108575, 108650, 108655, 110440, 110446, 110456, 110459, 110467, 110472, 125195, 125201, 125257, 125260, 125325, 125326, 125379, 125384, 201423, 201425, 201636, 201642, 215251, 215257, 215333, 215337, 215397, 215408, 215409, 215466, 215472, 259618, 259625, 55880, 55888)
-duplicates <- metadata[duplicate.rows,]
-write.xlsx(duplicates, file="duplicates.xlsx")
+# Make new column with measured value with its respective units.
+metadata$COMPONENT_VALUE <- paste(metadata$ORD_VALUE, metadata$REFERENCE_UNIT, ' ')
+
+# Remove unneccessary columns interfering with spread.
+unneeded_col <- c("PAT_ID", "MRN", "PAT_ENC_CSN_ID", "PROC_CODE", "PROC_NAME", "ORDERING_DATE", "ORD_VALUE", "ORD_NUM_VALUE", "REFERENCE_UNIT", "COMPONENT_ID", "COMPONENT_ABBR")
+metadata <- select(metadata, -unneeded_col)
+
+# Remove duplicate rows
+metadata <- unique(metadata)
+
+# Remove rows that have "CANCELLED" within the measured value
+metadata <- filter(metadata, !grepl("CANCELLED", COMPONENT_VALUE))
+
+# Find the rows with duplicated values in the specified columns implicated in spread error, for example if a patient on the same date had 2 different blood type results
+metadata <- metadata[order(metadata$`TOR ID_1`, metadata$RESULT_DATE, metadata$COMPONENT_NAME),]
+
+
+# Trying to use the spread function threw errors for certain rows, for example if a patient on the same date had 2 different blood type results
+# Find the rows with duplicated values in the specified columns implicated in spread error, for example if a patient on the same date had 2 different blood type results
+# Copied rows from output to txt file and ran the bash command: cat rows3.txt | sed 's/\*//' | tr '\n' ',' | sed 's/, /\n/g;s/,/\n/' > rows3-long.txt
+duplicate.rows <- readLines("rows3-long.txt")
+duplicate.rows <- as.numeric(duplicate.rows)
+
+# Write excel file with duplicates
+#duplicates <- metadata[duplicate.rows,]
+#write.xlsx(duplicates, file="duplicates.xlsx")
+
+
+# Remove duplicate rows
 metadata <- metadata[-duplicate.rows,]
 
-# Identify rows with an NA value for whatever value was trying to be measured.
-na_values <- which(is.na(metadata$ORD_VALUE))
-
-# Remove rows with an NA value in these columns
-metadata <- filter(metadata, !(row_number() %in% na_values))
-
-
-test <- metadata
-test$COMPONENT_VALUE <- paste(test$ORD_VALUE, test$REFERENCE_UNIT, ' ')
-unneeded_col <- c("PAT_ID", "MRN", "PAT_ENC_CSN_ID", "PROC_CODE", "PROC_NAME", "ORDERING_DATE", "ORD_VALUE", "ORD_NUM_VALUE", "REFERENCE_UNIT", "COMPONENT_ID", "COMPONENT_ABBR")
-test <- select(test, -unneeded_col)
-test <- filter(test, !grepl("CANCELLED", COMPONENT_VALUE))
-test <- unique(test)
-# Trying to use the spread function threw errors for these rows, for example if a patient on the same date had 2 different blood type results
-duplicate.rows <- readLines("rows2-long.txt")
-duplicate.rows <- as.numeric(duplicate.rows)
-duplicates2 <- test[duplicate.rows,]
-duplicates2 <- duplicates2[order(duplicates2$`TOR ID_1`, duplicates2$RESULT_DATE, duplicates2$COMPONENT_NAME),]
-write.xlsx(duplicates2, file="duplicates2.xlsx")
-test <- test[-duplicate.rows,]
-test <- test[order(test$`TOR ID_1`, test$RESULT_DATE, test$COMPONENT_NAME),]
-
-
-results_test <- test %>% 
-  spread("COMPONENT_NAME", "COMPONENT_VALUE")
-write.xlsx(results_test, file="TOR_lab-values.xlsx")
-
+# Transform long data to wide data: Make each measurement type a column with measurements as values in the column e.g. CREATININE & 0.59 MG/DL
 results <- metadata %>% 
-  spread("COMPONENT_NAME", "ORD_VALUE")
+  spread("COMPONENT_NAME", "COMPONENT_VALUE")
+#write.csv(results, file="TOR_lab-values.csv", row.names = F )
 
-# write.xlsx(results, file="TOR_lab-values.xlsx")
+############## Summarize number of measurements for each feature and place in bins ##################################
+# Get non-NA counts from  feature column
+nonna_counts <- sapply(results[,12:length(colnames(results))], function(x) sum(!is.na(x)))
+nonna_df <- data.frame(Measurement = names(nonna_counts), "non NA" = nonna_counts)
+nonna_df <- nonna_df[rev(order(nonna_df$non.NA)), ]
+#xlsx::write.xlsx(nonna_df, file="TOR_lab-value-counts.xlsx", row.names = F)
 
-colnames(results_test)
-summary(results_test)
+# Define the breaks for the bins
+breaks <- c(0, 500, 1000, 5000, 10000)
+
+# Use the cut function to bin the counts
+bins <- cut(nonna_counts, breaks = breaks)
+
+# Use the split function to split the counts into a list of vectors
+# with each vector containing the counts that fall within a specific bin
+binned_counts <- split(nonna_counts, bins)
+
+# Create a data frame for each bin
+binned_dfs <- lapply(binned_counts, function(x) data.frame(Measurement = names(x), "non NA" = x))
+
+# Write the data frames to the Excel file using write.xlsx()
+#xlsx::write.xlsx(binned_dfs[[1]], file="binned_lab-measurement_counts.xlsx", sheetName = "0-500", row.names = F)
+#xlsx::write.xlsx(binned_dfs[[2]], file="binned_lab-measurement_counts.xlsx", sheetName = "501-1000", row.names = F, append = T)
+#xlsx::write.xlsx(binned_dfs[[3]], file="binned_lab-measurement_counts.xlsx", sheetName = "1001-5000", row.names = F, append = T)
+#xlsx::write.xlsx(binned_dfs[[4]], file="binned_lab-measurement_counts.xlsx", sheetName = "5001-10000", row.names = F, append = T)
+
+
+
+################# Associate NWGC IDs with TORIDs in metadata ###########################
+torids <- readxl::read_xlsx("lookup_pharmhu_topmed_to5_rnaseq_1_final.xlsx")
+#torids <- torids[which(is.na(torids$Notes)),"TORID"] # Anything that had info in "Notes" was a bad sample.
+torids <- torids[which(is.na(torids$Notes)),c("NWGC Sample ID" , "TORID", "Tissue Type")] # Anything that had info in "Notes" was a bad sample.
+
+# See if TORIDs from lab measurements are found in TORIDs with RNA-seq data
+matching_rows <- which(results$`TOR ID_1` %in% torids$TORID | results$`TOR ID_2` %in% torids$TORID | results$`TOR ID_3` %in% torids$TORID)
+results <- results[matching_rows,]
+
+# Determine which TORIDs in the lab measurements metadata aren't found to the pharmhu_topmed lookup sheet
+#missing_torids <- results[-matching_rows,] 
+
+# Determine which TORIDs in the pharmhu_topmed lookup table can be found in the lab measurement metadata.
+present_TORID_rows <- which(torids$TORID %in% results$`TOR ID_1` | torids$TORID %in% results$`TOR ID_2` | torids$TORID %in% results$`TOR ID_3`)
+torids <- torids[present_TORID_rows,]
+
+# For testing code
+#results2 <- results
+#results <- results2
+
+# Add new columns that will contain NWGC IDs
+results$"CD71" <- NA
+results$"CD45" <- NA
+
+# Iterate through lab measurement metadata rows and add NWGC IDs
+# This is probably where the issue is happening due to multiple CD45 or CD71 NWGS IDs
+for (i in 1:nrow(results)) {
+  
+  #find rows in "torids" dataframe that match any of the values in the "TOR ID_1", "TOR ID_2", or "TOR ID_3" columns of the "results" dataframe
+  matching_rows <- torids[torids$TORID %in% results[i, c("TOR ID_1", "TOR ID_2", "TOR ID_3")],]
+
+  #loop through each matching row in "torids" dataframe
+  for (j in 1:nrow(matching_rows)) {
+    # check if "Tissue Type" column contains "CD71"
+    if (grepl("CD71", matching_rows[j, "Tissue Type"])) {
+      # fill in value from "NWGC Sample ID" column in "results" dataframe
+      results[i, "CD71"] <- matching_rows[j, "NWGC Sample ID"]
+    }
+    # check if "Tissue Type" column contains "CD45"
+    if (grepl("CD45", matching_rows[j, "Tissue Type"])) {
+      # fill in value from "NWGC Sample ID" column in "results" dataframe
+      results[i, "CD45"] <- matching_rows[j, "NWGC Sample ID"]
+    }
+  }
+}
+
+# Make the CD45+ & CD71+ NWGC IDs appear first.
+results <- results %>%
+  select("CD45", "CD71", everything())
+#write.csv(results, file="TOR_lab-values.csv", row.names = F )
+
+# Count number of unique CD45+ & CD71+ NWGC IDs
+length(unique(results$`CD45`)) # 8
+length(unique(results$`CD71`)) # 188
+
