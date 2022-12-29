@@ -3,28 +3,27 @@ library(tidyr)
 library(xlsx)
 library(purrr)
 
+# Read in file of lab measurements
 metadata <- readxl::read_xlsx("deident_Copy of KM_SC_GENOTYPE_LAB_VALUES - from past to 020618 on 020718.xlsx")
+
+# For testing
 #metadata2 <- metadata
-metadata <- metadata2
-#c("TOR ID_1", "COMPONENT_NAME", "ORD_VALUE")
+#metadata <- metadata2
 
-# Identify columns with all missing values
+# Identify columns with all missing values & drop them
 na_columns <- which(colSums(is.na(metadata)) == nrow(metadata))
-
-# Drop columns with all missing values
 metadata <- select(metadata, -na_columns)
 
 # Replace character "NA" values in the TOR ID_1 column with the NULL NA value in R
 metadata$`TOR ID_1` <- ifelse(metadata$`TOR ID_1` == "NA", NA, metadata$`TOR ID_1`)
 
-# Identify rows with an NA value in columns 2, 3, and 4
+# Identify rows with an NA value in columns 2, 3, and 4 (TORID Columns) & drop them
 na_rows <- which(is.na(metadata[,2]) & is.na(metadata[,3]) & is.na(metadata[,4]))
-
-# Remove rows with an NA value in these columns
 metadata <- filter(metadata, !(row_number() %in% na_rows))
 
 metadata<- unique(metadata)
 #metadata <- unique(metadata[,c("TOR ID_1", "COMPONENT_NAME", "ORD_VALUE", "ORDERING_DATE")])
+#Remove "CULTURE SOURCE" measurement due to repeat values.
 metadata <- metadata[which(metadata$COMPONENT_NAME!="CULTURE SOURCE"),]
 
 # Trying to use the spread function threw errors for these rows, for example if a patient on the same date had 2 different blood type results
