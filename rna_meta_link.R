@@ -97,7 +97,7 @@ binned_dfs <- lapply(binned_counts, function(x) data.frame(Measurement = names(x
 ################# Associate NWGC IDs with TORIDs in metadata ###########################
 torids <- readxl::read_xlsx("lookup_pharmhu_topmed_to5_rnaseq_1_final.xlsx")
 #torids <- torids[which(is.na(torids$Notes)),"TORID"] # Anything that had info in "Notes" was a bad sample.
-torids <- torids[which(is.na(torids$Notes)),c("NWGC Sample ID" , "TORID", "Tissue Type")] # Anything that had info in "Notes" was a bad sample.
+torids <- torids[which(is.na(torids$Notes)),c("NWGC Sample ID" , "TORID", "Tissue Type", "Pick Plate ID(s) - Indicates which samples were prepped together")] # Anything that had info in "Notes" was a bad sample.
 
 # See if TORIDs from lab measurements are found in TORIDs with RNA-seq data
 matching_rows <- which(results$`TOR ID_1` %in% torids$TORID | results$`TOR ID_2` %in% torids$TORID | results$`TOR ID_3` %in% torids$TORID)
@@ -117,6 +117,8 @@ torids <- torids[present_TORID_rows,]
 # Add new columns that will contain NWGC IDs
 results$"CD71" <- NA
 results$"CD45" <- NA
+results$CD71_Batch <- NA
+results$CD45_Batch <- NA
 
 # Iterate through lab measurement metadata rows and add NWGC IDs
 # This is probably where the issue is happening due to multiple CD45 or CD71 NWGS IDs
@@ -131,18 +133,20 @@ for (i in 1:nrow(results)) {
     if (grepl("CD71", matching_rows[j, "Tissue Type"])) {
       # fill in value from "NWGC Sample ID" column in "results" dataframe
       results[i, "CD71"] <- matching_rows[j, "NWGC Sample ID"]
+      results[i, "CD71_Batch"] <- matching_rows[j, "Pick Plate ID(s) - Indicates which samples were prepped together"]
     }
     # check if "Tissue Type" column contains "CD45"
     if (grepl("CD45", matching_rows[j, "Tissue Type"])) {
       # fill in value from "NWGC Sample ID" column in "results" dataframe
       results[i, "CD45"] <- matching_rows[j, "NWGC Sample ID"]
+      results[i, "CD45_Batch"] <- matching_rows[j, "Pick Plate ID(s) - Indicates which samples were prepped together"]
     }
   }
 }
 
 # Make the CD45+ & CD71+ NWGC IDs appear first.
 results <- results %>%
-  select("CD45", "CD71", everything())
+  select("CD45", "CD71", "CD45_Batch", "CD71_Batch", everything())
 #write.csv(results, file="TOR_lab-values.csv", row.names = F )
 
 # Count number of unique CD45+ & CD71+ NWGC IDs
