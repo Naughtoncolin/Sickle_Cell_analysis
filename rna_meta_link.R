@@ -64,7 +64,6 @@ metadata <- metadata[-duplicate.rows,]
 # Transform long data to wide data: Make each measurement type a column with measurements as values in the column e.g. CREATININE & 0.59 MG/DL
 results <- metadata %>% 
   spread("COMPONENT_NAME", "COMPONENT_VALUE")
-#write.csv(results, file="TOR_lab-values.csv", row.names = F )
 
 ############## Summarize number of measurements for each feature and place in bins ##################################
 # Get non-NA counts from  feature column
@@ -147,9 +146,65 @@ for (i in 1:nrow(results)) {
 # Make the CD45+ & CD71+ NWGC IDs appear first.
 results <- results %>%
   select("CD45", "CD71", "CD45_Batch", "CD71_Batch", everything())
-#write.csv(results, file="TOR_lab-values.csv", row.names = F )
 
 # Count number of unique CD45+ & CD71+ NWGC IDs
 length(unique(results$`CD45`)) # 8
 length(unique(results$`CD71`)) # 188
 
+###### Add date of RNA collection
+# For testing code
+#results2 <- results
+results <- results2
+
+dates <- readxl::read_xlsx("Omics_Master list(2).xlsx", sheet = "Omic Master List_Long")
+
+dates <- dates[!is.na(dates$`TOR ID`),]
+
+# Create an empty column in results for each date of collection
+
+results$TORID_1_Date_of_collection <- NA
+results$TORID_2_Date_of_collection <- NA
+results$TORID_3_Date_of_collection <- NA
+
+# Loop through each row in the dates data frame
+for(i in 1:nrow(dates)) {
+  # Get the TOR ID and date of collection for the current row
+  tor_id <- dates[i, "TOR ID"]
+  date_of_collection <- dates[i, "Date of collection"]
+  
+  # Find the rows in results where TOR ID appears in either TOR ID_1, TOR ID_2, or TOR ID_3
+  row_indexes <- which(results$`TOR ID_1` %in% tor_id | results$`TOR ID_2` %in% tor_id | results$`TOR ID_3` %in% tor_id)
+
+  # If any matching rows were found, add the date of collection to the appropriate column
+  if(length(row_indexes) > 0) {
+    print("match")
+    for(row_index in row_indexes) {
+      if(results[row_index, "TOR ID_1"] %in% tor_id) {
+        results[row_index, "TORID_1_Date_of_collection"] <- date_of_collection
+      } else if(results[row_index, "TOR ID_2"] %in% tor_id) {
+        results[row_index, "TORID_2_Date_of_collection"] <- date_of_collection
+      } else if(results[row_index, "TOR ID_3"] %in% tor_id) {
+        results[row_index, "TORID_3_Date_of_collection"] <- date_of_collection
+      }
+    }
+  }
+}
+
+# Reorder the columns
+results <- results %>%
+  select("CD45", "CD71", "CD45_Batch", "CD71_Batch", "TORID_1_Date_of_collection", 
+         "TORID_2_Date_of_collection", "TORID_3_Date_of_collection", everything())
+
+# Write new metadata file
+#write.csv(results, file="TOR_lab-values.csv", row.names = F )
+
+# Count how many rows don't have a date for a TORID
+sum(is.na(results$TORID_1_Date_of_collection) & !is.na(results$`TOR ID_1`)) #69, all from single donor
+sum(is.na(results$TORID_2_Date_of_collection) & !is.na(results$`TOR ID_2`)) #0
+sum(is.na(results$TORID_3_Date_of_collection) & !is.na(results$`TOR ID_3`)) #15, from two donors
+
+# Used to count number of donors that have a TORID with no date. Manually inspected.
+#nodate.TORIDs <- results[which(is.na(results$TORID_3_Date_of_collection) & !is.na(results$`TOR ID_3`)),]
+
+# Count number of paired CD45 & CD71 NWGC IDs
+sum(which(!is.na(results$CD45) & !is.na(results$CD71))) #0, This seems to be a problem
