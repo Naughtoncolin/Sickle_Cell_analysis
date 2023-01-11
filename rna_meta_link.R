@@ -34,7 +34,7 @@ metadata <- metadata[which(metadata$COMPONENT_NAME!="CULTURE SOURCE"),]
 metadata$COMPONENT_VALUE <- paste(metadata$ORD_VALUE, metadata$REFERENCE_UNIT, ' ')
 
 # Remove unneccessary columns interfering with spread.
-unneeded_col <- c("PAT_ID", "MRN", "PAT_ENC_CSN_ID", "PROC_CODE", "PROC_NAME", "ORDERING_DATE", "ORD_VALUE", "ORD_NUM_VALUE", "REFERENCE_UNIT", "COMPONENT_ID", "COMPONENT_ABBR")
+unneeded_col <- c("PAT_ID", "PAT_ENC_CSN_ID", "PROC_CODE", "PROC_NAME", "ORDERING_DATE", "ORD_VALUE", "ORD_NUM_VALUE", "REFERENCE_UNIT", "COMPONENT_ID", "COMPONENT_ABBR")
 metadata <- select(metadata, -unneeded_col)
 
 # Remove duplicate rows
