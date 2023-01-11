@@ -236,28 +236,6 @@ for(i in 1:nrow(pain)){
   }
 }
 
-###### Add additional timepoints NOTE: THIS DIDN"T APPEAR TO BE FRUITFUL UPON MANUAL INSPECTION OF TIMEPOINTS
-#timepoints <- readxl::read_xlsx("Complete RNA list from BCM.xlsx")
-#pain$New_timepoints <- NA
-timepoints <- data.frame(timepoints)
-#pain2 <- pain
-#pain <- pain2
-cols_to_check <- c("SS..SP..SD..Untreated", "SC..Untreated", "Transfusion", "HU.MTD", "Inpatient", "Inpatient.f.u", "Metformin..baseline", "Metformin..MTD")
-for (i in 1:nrow(pain)) {
-  if(!is.na(pain$`Investigator.RNA.Plasma.ID`[i])){
-    print(pain$`Investigator.RNA.Plasma.ID`[i])
-    for (col in cols_to_check) {
-      if(pain$`Investigator.RNA.Plasma.ID`[i] %in% timepoints[,col]){
-        print(col)
-        col <- sub("\r\n", " ", col)
-        pain$New_timepoints[i] <- col
-      }
-    }    
-  }
-}
-#pain <- pain %>%
-#select( "Timepoint..at.RNA.collection.", "New_timepoints", everything())
-
 #################### Combine IDs that can be found in a VCF into single column ######################
 
 pain$Combine_VCF_IDs <- NA
@@ -427,16 +405,14 @@ sum(!is.na(unique(passqc.labmeasurements.TORID$Combine_VCF_IDs)))
 #################### Write xslx file ###################################################
 
 pain <- as.data.frame(pain)
-all.TORID <- pain[which(!is.na(pain$TOPMed.RNA.ID..CD45..)|!is.na(pain$TOPMed.RNA.ID..CD71..)),] #Get rows that have TORID
-passqc.TORID <- all.TORID[is.na(all.TORID$CD45_notes)&is.na(all.TORID$CD71_notes),]
 summary.table <- as.data.frame(summary.table)
 
 library(xlsx)
-write.xlsx(pain, file = "../pain-omics-phenotype/Pain omics Phenotype_230109.xlsx", sheetName = "All",
+write.xlsx(pain, file = "../pain-omics-phenotype/Pain omics Phenotype_230111.xlsx", sheetName = "All",
            col.names = TRUE, row.names = FALSE, append = FALSE, showNA=FALSE)
-write.xlsx(all.TORID, file = "../pain-omics-phenotype/Pain omics Phenotype_230109.xlsx", sheetName = "All TORIDs",
+write.xlsx(all.TORID, file = "../pain-omics-phenotype/Pain omics Phenotype_230111.xlsx", sheetName = "All TORIDs",
            col.names = TRUE, row.names = FALSE, append = TRUE, showNA=FALSE)
-write.xlsx(passqc.TORID, file = "../pain-omics-phenotype/Pain omics Phenotype_230109.xlsx", sheetName = "TORIDs Passing QC",
+write.xlsx(passqc.TORID, file = "../pain-omics-phenotype/Pain omics Phenotype_230111.xlsx", sheetName = "TORIDs Passing QC",
            col.names = TRUE, row.names = FALSE, append = TRUE, showNA=FALSE)
-write.xlsx(summary.table, file = "../pain-omics-phenotype/Pain omics Phenotype_230109.xlsx", sheetName = "Summary",
+write.xlsx(summary.table, file = "../pain-omics-phenotype/Pain omics Phenotype_230111.xlsx", sheetName = "Summary",
            col.names = TRUE, row.names = FALSE, append = TRUE, showNA=FALSE)
