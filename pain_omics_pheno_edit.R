@@ -240,7 +240,7 @@ for(i in 1:nrow(pain)){
 #timepoints <- readxl::read_xlsx("Complete RNA list from BCM.xlsx")
 #pain$New_timepoints <- NA
 timepoints <- data.frame(timepoints)
-pain2 <- pain
+#pain2 <- pain
 #pain <- pain2
 cols_to_check <- c("SS..SP..SD..Untreated", "SC..Untreated", "Transfusion", "HU.MTD", "Inpatient", "Inpatient.f.u", "Metformin..baseline", "Metformin..MTD")
 for (i in 1:nrow(pain)) {
@@ -306,7 +306,7 @@ pain <- pain %>%
          "Ethnicity", "TOPMed.RNA.ID..CD45..", "TOPMed.RNA.ID..CD71..", everything())
 
 #pain2 <- pain
-pain <- pain2
+#pain <- pain2
 # Remove patient info and make anonymized subject ID
 #pain$MRN <- NULL
 #CONTINUE
@@ -349,8 +349,12 @@ passqc.labmeasurements.TORID <- merge(passqc.TORID, filtered_df, by = colnames(p
 
 # Fill in missing sex for 1 individual
 passqc.labmeasurements.TORID$Sex <- ifelse(is.na(passqc.labmeasurements.TORID$Sex), passqc.labmeasurements.TORID$SEX, passqc.labmeasurements.TORID$Sex)
+passqc.labmeasurements.TORID$Sex <- ifelse(!is.na(passqc.labmeasurements.TORID$Sex), passqc.labmeasurements.TORID$Investigator.Sex, passqc.labmeasurements.TORID$Sex)
+passqc.labmeasurements.TORID$Sex <- sub("Male", "M", passqc.labmeasurements.TORID$Sex)
+passqc.labmeasurements.TORID$Sex <- sub("Female", "F", passqc.labmeasurements.TORID$Sex)
+passqc.labmeasurements.TORID$Investigator.Sex <- NULL
 
-#Remove columns thaat had been in lab measurements that are no longer useful.
+#Remove columns that had been in lab measurements that are no longer useful.
 col_to_remove <- c("TORID_1_Date_of_collection", "TORID_2_Date_of_collection", "TORID_2_Date_of_collection", "TOR.ID_1", "TOR.ID_2", 
                    "TOR.ID_3", "Sample.ID_1", "Sample.ID_2", "Sample_3", "SEX", "DOB", "RACE", "ETHNICITY")
 passqc.labmeasurements.TORID <- passqc.labmeasurements.TORID %>% select(-one_of(col_to_remove))
@@ -375,7 +379,7 @@ sum(!is.na(passqc.labmeasurements.TORID$Birthday))
 sum(!is.na(passqc.labmeasurements.TORID$Race))
 passqc.labmeasurements.TORID <- passqc.labmeasurements.TORID %>%
   group_by(MRN) %>%
-  fill(c(Birthday, Race, Ethnicity, Sex, Investigator.Sex, Combine_VCF_IDs, St.Jude.DNA.ID, NWD_ID,
+  fill(c(Birthday, Race, Ethnicity, Sex, Combine_VCF_IDs, St.Jude.DNA.ID, NWD_ID,
          Avg.pain.admissions.per.yr), .direction = "updown") %>%
   ungroup()
 
