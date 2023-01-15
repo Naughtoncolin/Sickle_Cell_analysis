@@ -412,14 +412,16 @@ sum(!is.na(unique(passqc.labmeasurements.TORID$Combined_VCF_IDs)))
 #################### Write xslx file ###################################################
 
 pain <- as.data.frame(pain)
+passqc.labmeasurements.TORID <- as.data.frame(passqc.labmeasurements.TORID)
 summary.table <- as.data.frame(summary.table)
-
 library(xlsx)
-write.xlsx(pain, file = "../pain-omics-phenotype/Pain omics Phenotype_230111.xlsx", sheetName = "All",
+write.xlsx(pain, file = "../pain-omics-phenotype/Pain omics Phenotype_230112.xlsx", sheetName = "All",
            col.names = TRUE, row.names = FALSE, append = FALSE, showNA=FALSE)
-write.xlsx(all.TORID, file = "../pain-omics-phenotype/Pain omics Phenotype_230111.xlsx", sheetName = "All TORIDs",
+write.xlsx(all.TORID, file = "../pain-omics-phenotype/Pain omics Phenotype_230112.xlsx", sheetName = "All TORIDs",
            col.names = TRUE, row.names = FALSE, append = TRUE, showNA=FALSE)
-write.xlsx(passqc.TORID, file = "../pain-omics-phenotype/Pain omics Phenotype_230111.xlsx", sheetName = "TORIDs Passing QC",
+write.xlsx(passqc.TORID, file = "../pain-omics-phenotype/Pain omics Phenotype_230112.xlsx", sheetName = "TORIDs Passing QC",
            col.names = TRUE, row.names = FALSE, append = TRUE, showNA=FALSE)
-write.xlsx(summary.table, file = "../pain-omics-phenotype/Pain omics Phenotype_230111.xlsx", sheetName = "Summary",
+write.xlsx(passqc.labmeasurements.TORID, file = "../pain-omics-phenotype/Pain omics Phenotype_230112.xlsx", sheetName = "TORIDs Passing QC with measurements",
+           col.names = TRUE, row.names = FALSE, append = TRUE, showNA=FALSE)
+write.xlsx(summary.table, file = "../pain-omics-phenotype/Pain omics Phenotype_230112.xlsx", sheetName = "Summary",
            col.names = TRUE, row.names = FALSE, append = TRUE, showNA=FALSE)
