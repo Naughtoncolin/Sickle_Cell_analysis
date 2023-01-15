@@ -341,8 +341,8 @@ row.names(results_df) <- colnames(passqc.labmeasurements.TORID)
 
 # Remove any columns that have more than a certain number of NA
 threshold <- 100
-passqc.labmeasurements.TORID <- passqc.labmeasurements.TORID[, colSums(is.na(passqc.labmeasurements.TORID)) 
-                                                             < nrow(passqc.labmeasurements.TORID) - threshold]
+#passqc.labmeasurements.TORID <- passqc.labmeasurements.TORID[, colSums(is.na(passqc.labmeasurements.TORID)) 
+#                                                             < nrow(passqc.labmeasurements.TORID) - threshold]
 
 #### Fill in missing things again...
 #delete <- passqc.labmeasurements.TORID
@@ -351,9 +351,22 @@ sum(!is.na(passqc.labmeasurements.TORID$Birthday))
 sum(!is.na(passqc.labmeasurements.TORID$Race))
 passqc.labmeasurements.TORID <- passqc.labmeasurements.TORID %>%
   group_by(MRN) %>%
-  fill(c(Birthday, Race, Ethnicity, Sex, Combine_VCF_IDs, St.Jude.DNA.ID, NWD_ID,
+  fill(c(Birthday, Race, Ethnicity, Sex, Combined_VCF_IDs, St.Jude.DNA.ID, NWD_ID,
          Avg.pain.admissions.per.yr), .direction = "updown") %>%
   ungroup()
+
+#Fix sex for other data frames
+pain$Sex <- passqc.labmeasurements.TORID$Sex[match(pain$MRN, passqc.labmeasurements.TORID$MRN)]
+all.TORID$Sex <- passqc.labmeasurements.TORID$Sex[match(all.TORID$MRN, passqc.labmeasurements.TORID$MRN)]
+passqc.TORID$Sex <- passqc.labmeasurements.TORID$Sex[match(passqc.TORID$MRN, passqc.labmeasurements.TORID$MRN)]
+
+#Remove columns that had been in lab measurements that are no longer useful.
+col_to_remove <- c("MRN", "Birthday", "CD45", "CD71", "TORID_1_Date_of_collection", "TORID_2_Date_of_collection", "Investigator.Sex",
+                   "TORID_2_Date_of_collection", "TOR.ID_1", "TOR.ID_2", "TOR.ID_3", "Sample.ID_1", "Sample.ID_2", "Sample_3", "SEX", "DOB", "RACE", "ETHNICITY")
+pain <- pain %>% select(-one_of(col_to_remove))
+all.TORID <- all.TORID %>% select(-one_of(col_to_remove))
+passqc.TORID <- passqc.TORID %>% select(-one_of(col_to_remove))
+passqc.labmeasurements.TORID <- passqc.labmeasurements.TORID %>% select(-one_of(col_to_remove))
 
 
 ############################# Summarize #########################
