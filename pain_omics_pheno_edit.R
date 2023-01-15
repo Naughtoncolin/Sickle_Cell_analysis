@@ -323,15 +323,13 @@ passqc.labmeasurements.TORID <- merge(passqc.TORID, filtered_df, by = colnames(p
 
 # Fill in missing sex for 1 individual
 passqc.labmeasurements.TORID$Sex <- ifelse(is.na(passqc.labmeasurements.TORID$Sex), passqc.labmeasurements.TORID$SEX, passqc.labmeasurements.TORID$Sex)
-passqc.labmeasurements.TORID$Sex <- ifelse(!is.na(passqc.labmeasurements.TORID$Sex), passqc.labmeasurements.TORID$Investigator.Sex, passqc.labmeasurements.TORID$Sex)
+passqc.labmeasurements.TORID$Sex <- ifelse(is.na(passqc.labmeasurements.TORID$Sex), passqc.labmeasurements.TORID$Investigator.Sex, passqc.labmeasurements.TORID$Sex)
 passqc.labmeasurements.TORID$Sex <- sub("Male", "M", passqc.labmeasurements.TORID$Sex)
 passqc.labmeasurements.TORID$Sex <- sub("Female", "F", passqc.labmeasurements.TORID$Sex)
 passqc.labmeasurements.TORID$Investigator.Sex <- NULL
+#Note: MET011 shows up as Male in some spreadsheets, but female in others. THe female seems more reliable since it's found in the 
+# lab measurement sheet which seems comprehensive. Also, NWGC didn't come to a conclusion about the sex.
 
-#Remove columns that had been in lab measurements that are no longer useful.
-col_to_remove <- c("TORID_1_Date_of_collection", "TORID_2_Date_of_collection", "TORID_2_Date_of_collection", "TOR.ID_1", "TOR.ID_2", 
-                   "TOR.ID_3", "Sample.ID_1", "Sample.ID_2", "Sample_3", "SEX", "DOB", "RACE", "ETHNICITY")
-passqc.labmeasurements.TORID <- passqc.labmeasurements.TORID %>% select(-one_of(col_to_remove))
 
 #### Make data frame with number of occurrences of different lab measurements
 # Create empty data frame with correct number of rows
