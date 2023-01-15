@@ -282,17 +282,14 @@ pain <- pain %>%
 #pain$Met_ID <- met$"Investigator ID1 (DNA ID1)"[match(pain$Investigator.RNA.Plasma.ID, met$`Sample ID_CD71 (RNA ID)`)]
 #There are inconsistencies between the MET IDs in this excell and what is documented in the metadata file already
 
-#pain2 <- pain
-#pain <- pain2
 # Remove patient info and make anonymized subject ID
-#pain$MRN <- NULL
-#CONTINUE
+mrn <- data.frame("mrn"=unique(pain$Subject_ID), "id"=1:length(unique(pain$Subject_ID)))
+pain$Subject_ID <- mrn$id[match(pain$Subject_ID, mrn$mrn)]
 
 #pain$DOB <- NULL # DOB column was interrupting merge
 pain <- as.data.frame(pain)
 all.TORID <- pain[which(!is.na(pain$TOPMed.RNA.ID..CD45..)|!is.na(pain$TOPMed.RNA.ID..CD71..)),] #Get rows that have TORID
 passqc.TORID <- all.TORID[is.na(all.TORID$CD45_notes)&is.na(all.TORID$CD71_notes),]
-
 
 
 # Make merged data frame with lab measurements based on collection date, then make another dataframe
