@@ -5,18 +5,13 @@ library(tidyr)
 pain <- readxl::read_xlsx("../pain-omics-phenotype/Pain omics Phenotype_221117.xlsx")
 
 ###################### Add blood collection dates and MRN info to "Pain omics Phenotype" ##########################3
-pain$Blood_collection_date <- NA
-pain$Blood_processing_date <- NA
-pain$RNA_extraction_date <- NA
-pain$MRN <- NA
-pain$Birthday <- NA
-pain$Age_at_collection <- NA
-pain$Race <- NA
-pain$Ethnicity <- NA
-pain$Sex <- NA
+# Add columns for data that will be added later
+pain[c("Blood_collection_date", "Blood_processing_date", "RNA_extraction_date", "MRN", 
+       "Birthday", "Race", "Ethnicity", "Sex")] <- NA
 
-###TRy with lab measurement MRN and Birthday
+###Try with lab measurement MRN and Birthday
 lab.measurements <- read.csv("TOR_lab-values.csv")
+
 # Format the dates to "YYYY-MM-DD"
 for(j in 1:nrow(lab.measurements)){
   if(!is.na(lab.measurements$RESULT_DATE[j])){
@@ -216,7 +211,6 @@ for (i in 1:nrow(pain)) {
     if (pain$MRN[i] %in% unique_ids$MRN) {
       # If the "MRN" value is NA, look up the corresponding "MRN" value
       # in the "unique_ids" data frame and set it in the "pain" data frame
-      
       pain$`Investigator.Sex`[i] <- unique_ids$`Investigator.Sex`[unique_ids$MRN == pain$MRN[i]]
     }
   }
@@ -229,23 +223,23 @@ sum(!is.na(pain$MRN)) #585
 sum(!is.na(pain$Investigator.DNA.ID)) #811
 
 ####### Make subject ID column#################
-pain$Subj <- pain$MRN
+pain$Subject_ID <- pain$MRN
 for(i in 1:nrow(pain)){
-  if(is.na(pain$Subj[i])){
-    pain$Subj[i] <- pain$Investigator.DNA.ID[i]
+  if(is.na(pain$Subject_ID[i])){
+    pain$Subject_ID[i] <- pain$Investigator.DNA.ID[i]
   }
 }
 
 #################### Combine IDs that can be found in a VCF into single column ######################
 
-pain$Combine_VCF_IDs <- NA
-pain$Combine_VCF_IDs <- ifelse(is.na(pain$St.Jude.DNA.ID) | is.na(pain$NWD_ID), NA, paste0(pain$St.Jude.DNA.ID, "_", pain$NWD_ID))
-pain$Combine_VCF_IDs <- ifelse(is.na(pain$Combine_VCF_IDs), pain$St.Jude.DNA.ID, pain$Combine_VCF_IDs)
-pain$Combine_VCF_IDs <- ifelse(is.na(pain$Combine_VCF_IDs), pain$NWD_ID, pain$Combine_VCF_IDs)
+pain$Combined_VCF_IDs <- NA
+pain$Combined_VCF_IDs <- ifelse(is.na(pain$St.Jude.DNA.ID) | is.na(pain$NWD_ID), NA, paste0(pain$St.Jude.DNA.ID, "_", pain$NWD_ID))
+pain$Combined_VCF_IDs <- ifelse(is.na(pain$Combined_VCF_IDs), pain$St.Jude.DNA.ID, pain$Combined_VCF_IDs)
+pain$Combined_VCF_IDs <- ifelse(is.na(pain$Combined_VCF_IDs), pain$NWD_ID, pain$Combined_VCF_IDs)
 
 #
-sum(!is.na(pain$TOPMed.RNA.ID..CD45..) & !is.na(pain$Combine_VCF_IDs)) #306
-sum(!is.na(pain$TOPMed.RNA.ID..CD71..) & !is.na(pain$Combine_VCF_IDs)) #330
+sum(!is.na(pain$TOPMed.RNA.ID..CD45..) & !is.na(pain$Combined_VCF_IDs)) #306
+sum(!is.na(pain$TOPMed.RNA.ID..CD71..) & !is.na(pain$Combined_VCF_IDs)) #330
 
 pain <- pain %>%
   select("MRN","Investigator.DNA.ID", "St.Jude.DNA.ID", "NWD_ID", "Chronic.Pain.", "TOPMed.RNA.ID..CD45..","CD45_NWGC_ID", "CD71_notes", "TOPMed.RNA.ID..CD71..", "CD71_NWGC_ID", "CD45_libprep_batch", 
@@ -273,13 +267,13 @@ for(j in 1:nrow(lab.measurements)){
 ###Testing
 # Reorder the columns
 pain <- pain %>%
-  select("MRN","Investigator.DNA.ID", "Subj", "Chronic.Pain.", 
+  select("MRN","Investigator.DNA.ID", "Subject_ID", "Chronic.Pain.", 
          "Birthday", "Blood_collection_date", "Blood_processing_date","RNA_extraction_date", 
          "Chronic.Pain.", "Timepoint..at.RNA.collection.", "Therapy..at.RNA.collection.", "Race",
          "Ethnicity", "TOPMed.RNA.ID..CD45..", "TOPMed.RNA.ID..CD71..", everything())
 pain <- pain %>%
-  select("MRN","Investigator.DNA.ID", "Subj", "Chronic.Pain.", 
-         "Birthday", "Blood_collection_date", "Race", "Ethnicity", "Combine_VCF_IDs", 
+  select("MRN","Investigator.DNA.ID", "Subject_ID", "Chronic.Pain.", 
+         "Birthday", "Blood_collection_date", "Race", "Ethnicity", "Combined_VCF_IDs", 
          "Chronic.Pain.", "Timepoint..at.RNA.collection.", "Therapy..at.RNA.collection.", "Race",
          "Ethnicity", "TOPMed.RNA.ID..CD45..", "TOPMed.RNA.ID..CD71..", everything())
 
@@ -376,13 +370,13 @@ passqc.labmeasurements.TORID$Chronic.Pain. <- factor(passqc.TORID$Chronic.Pain.)
 summary.table <- passqc.labmeasurements.TORID %>%
   group_by(`Timepoint..at.RNA.collection.`, `Chronic.Pain.`, .drop = F) %>%
   summarize(`CD45 TORID #` = sum(!is.na(`TOPMed.RNA.ID..CD45..`)),
-            `CD45 Subject #` = sum(!is.na(`TOPMed.RNA.ID..CD45..`) & !is.na(`Subj`)),
+            `CD45 Subject #` = sum(!is.na(`TOPMed.RNA.ID..CD45..`) & !is.na(`Subject_ID`)),
             `CD45 Collection Date #` = sum(!is.na(TOPMed.RNA.ID..CD45..) & !is.na(Blood_collection_date)),
-            `CD45 VCF ID #` = sum(!is.na(TOPMed.RNA.ID..CD45..) & !is.na(Combine_VCF_IDs)),
+            `CD45 VCF ID #` = sum(!is.na(TOPMed.RNA.ID..CD45..) & !is.na(Combined_VCF_IDs)),
             `CD71 TORID #` = sum(!is.na(`TOPMed.RNA.ID..CD71..`)),
-            `CD71 Subject #` = sum(!is.na(`TOPMed.RNA.ID..CD71..`) & !is.na(`Subj`)),
+            `CD71 Subject #` = sum(!is.na(`TOPMed.RNA.ID..CD71..`) & !is.na(`Subject_ID`)),
             `CD71 Collection Date #` = sum(!is.na(TOPMed.RNA.ID..CD71..) & !is.na(Blood_collection_date)),
-            `CD71 VCF ID #` = sum(!is.na(TOPMed.RNA.ID..CD71..) & !is.na(Combine_VCF_IDs)))
+            `CD71 VCF ID #` = sum(!is.na(TOPMed.RNA.ID..CD71..) & !is.na(Combined_VCF_IDs)))
 
 summary.table <- summary.table %>%
   mutate(`sum_TORID` = `CD45 TORID #` + `CD71 TORID #`)
@@ -398,7 +392,7 @@ sum(!is.na(all.TORID$TOPMed.RNA.ID..CD45..) & !is.na(all.TORID$CD45_notes)) #29
 sum(!is.na(all.TORID$TOPMed.RNA.ID..CD71..) & !is.na(all.TORID$CD71_notes)) #17
 
 # Unique VCF IDs
-sum(!is.na(unique(passqc.labmeasurements.TORID$Combine_VCF_IDs)))
+sum(!is.na(unique(passqc.labmeasurements.TORID$Combined_VCF_IDs)))
 
 
 
