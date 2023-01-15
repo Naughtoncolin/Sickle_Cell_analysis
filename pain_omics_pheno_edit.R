@@ -276,6 +276,11 @@ pain <- pain %>%
          "Birthday", "Blood_collection_date", "Race", "Ethnicity", "Combined_VCF_IDs", 
          "Chronic.Pain.", "Timepoint..at.RNA.collection.", "Therapy..at.RNA.collection.", "Race",
          "Ethnicity", "TOPMed.RNA.ID..CD45..", "TOPMed.RNA.ID..CD71..", everything())
+### Add Met IDs 
+#met<- readxl::read_xlsx("Edited Metformin IDs.xlsx")
+#pain$Met_ID <- NA
+#pain$Met_ID <- met$"Investigator ID1 (DNA ID1)"[match(pain$Investigator.RNA.Plasma.ID, met$`Sample ID_CD71 (RNA ID)`)]
+#There are inconsistencies between the MET IDs in this excell and what is documented in the metadata file already
 
 #pain2 <- pain
 #pain <- pain2
