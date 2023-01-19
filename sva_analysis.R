@@ -1,33 +1,69 @@
 setwd("C:/Users/Naugh/Dropbox (GaTech)/Gibson/Working/SickleCell/metadata/RNA/")
 
+library(dplyr)
 library(sva)
-
-########### Prep gene count matrix ##########################
-gct <- read.table("CD71_tpm_counts_log2_subset.gct", header = T, check.names = F )
-
-# Remove rows where gene name is a duplicate (Is this necessary?)
-gct <- gct[which(!duplicated(gct$Description)),]
-#non_unique_values <- gct$Description[duplicated(gct$Description)]
-
-# Remove gene column from count matrix
-gct <- gct[,-1]
-
-# Remove genes where counts are zero for all samples
-gct <- gct[which(rowSums(gct) != 0),]
-
-# SVA doesn't allow data frames, must convert to matrix
-gct <- as.matrix(gct)
+library(snm)
+library(pvca)
+library(Biobase)
 
 ########### Prep metadata ####################################
-pheno <- read.table("CD71_metadata_subset2.txt", header = T, check.names = F, sep = "\t")
+pheno <- readxl::read_xlsx("../pain-omics-phenotype/Pain omics Phenotype_230112.xlsx", 
+                           sheet = "TORIDs Passing QC with measurem")
+pheno <- as.data.frame(pheno)
 
-# Subset metadata down to desired features
-features <- c("CD71", "CD71_Batch", "SEX", "RACE", "ETHNICITY", "HGB")
-pheno <- select(pheno, features)
+# Subset down to samples with NWGC IDs associated with CD71 TORIDs
+pheno <- pheno[!is.na(pheno$CD71_NWGC_ID),]
+
+#Select columns for downstream analysis
+#feature_col <- c("CD71_libprep_batch", "Investigator.Sex", "Timepoint..at.RNA.collection.")
+#feature_col <- c("CD71_NWGC_ID", "Subject_ID", "CD71_libprep_batch", "Sex", "Timepoint..at.RNA.collection.")
+feature_col <- c("CD71_NWGC_ID", "Subject_ID", "CD71_libprep_batch", "Sex", "Timepoint..at.RNA.collection.", "Chronic.Pain.")
+pheno <- pheno %>% select(any_of(feature_col))
+
+#Drop rows with NA
+# IS THIS NECESSARY?
+pheno <- na.omit(pheno)
+
+# Make metadata column grouping points\
+base <- c("Baseline", "HU", "HU MTD", "Metformin Baseline", "Metformin", "Metformin MTD")
+pheno$baseline.vs.voc <- ifelse(pheno$Timepoint..at.RNA.collection. %in% base, "Baseline", pheno$Timepoint..at.RNA.collection.)
+pheno <- pheno[which(pheno$baseline.vs.voc!="Inpatient F/U"),] # Get id of VOC F/U
+pheno$Timepoint..at.RNA.collection. <- NULL
+
+
+#Subset to unique individuals with baseline & VOC
+# There are still duplicates accross the two categories
+pheno <- pheno %>% 
+  select(CD71_NWGC_ID, Subject_ID, baseline.vs.voc, CD71_libprep_batch, Sex, Chronic.Pain.) %>%
+  group_by(baseline.vs.voc) %>% 
+  distinct(Subject_ID, .keep_all = T) %>%
+  ungroup() %>%
+  as.data.frame()
+row.names(pheno) <- pheno$CD71_NWGC_ID
+pheno$CD71_NWGC_ID <- NULL
+#ids <- as.character(pheno$CD71_NWGC_ID)
+#pheno$CD71_NWGC_ID <- NULL
+#row.names(pheno) <- ids
 
 #Change metadata to numeric for numeric features
-pheno$HGB <- as.numeric(sub(" .*", "", pheno$HGB))
-#pheno$`LYMPH%` <- as.numeric(sub(" .*", "", pheno$`LYMPH%`))
+#pheno$HGB <- as.numeric(sub(" .*", "", pheno$HGB))
+
+# Select 10 random rows for each "Baseline" and "Inpatient VOC" group
+#pheno <- pheno %>%
+select(CD71_NWGC_ID, Subject_ID, baseline.vs.voc, CD71_libprep_batch, Sex) %>%
+  group_by(baseline.vs.voc) %>% 
+  distinct(Subject_ID, .keep_all = T) %>%
+  sample_n(10) %>%
+  ungroup() %>%
+  as.data.frame()
+#ids <- as.character(pheno$CD71_NWGC_ID)
+#pheno$CD71_NWGC_ID <- NULL
+#row.names(pheno) <- ids
+row.names(pheno) <- pheno$CD71_NWGC_ID
+pheno$CD71_NWGC_ID <- NULL
+
+
+
 
 # Change metadata character columns to factors
 pheno[] <- lapply(pheno, function(x) {
@@ -37,27 +73,186 @@ pheno[] <- lapply(pheno, function(x) {
     x
   }
 })
-pheno$CD71 <- as.factor(pheno$CD71)
-pheno$CD71_Batch <- as.factor(pheno$CD71_Batch)
+#pheno$Subject_ID <- as.character(pheno$Subject_ID)
+pheno$Subject_ID <- as.factor(pheno$Subject_ID)
+#pheno$CD71_NWGC_ID <- as.factor(pheno$CD71_NWGC_ID)
+#pheno$CD71_libprep_batch <- as.factor(pheno$CD71_libprep_batch)
+#pheno$CD71_Batch <- as.factor(pheno$CD71_Batch)
 
-##################### Run SVA ########################################
+########### Prep gene count matrix ##########################
+#gct <- read.table("CD71_tpm_counts_log2_subset.gct", header = T, check.names = F )
+gct <- read.table("cd71_tpm_counts.gct", header = T, check.names = F)
+#gct2 <- gct
+gct <- gct2
 
-# Make formulas for modeling matrix in next step. Useful for when using large numbers of features
+
+# Remove rows where gene name is a duplicate (why are they present?) and remove gene name column
+gct <- gct[!duplicated(gct$Description),]
+rownames(gct) <- gct$Description
+gct <- gct[,-1]
+
+###Filter lowly expressed genes
+threshold <- 0.1
+n_samples <- ncol(gct)
+# remove genes that are not expressed in at least 10% of samples
+gct <- gct[which(rowSums(gct > 0)/n_samples >= threshold), ]
+
+# Remove sample not found in metadata and order the count matrix with respect to the metadata
+cols_to_keep <- colnames(gct) %in% rownames(pheno)
+gct <- gct[, cols_to_keep]
+gct <- gct[, order(match(colnames(gct), rownames(pheno)))]
+
+# SVA doesn't allow data frames, must convert to matrix.
+gct <- as.matrix(gct)
+
+# Remove genes where counts are zero for all samples
+gct <- gct[which(rowSums(gct) != 0),]
+
+gct <- apply(gct, 2, function(x) log2(x+1))
+
+##################### PVCA with original covariates #################
+#covariates <- c("Subject_ID", "CD71_libprep_batch", "Sex", "baseline.vs.voc")
+covariates <- c("CD71_libprep_batch", "Sex", "baseline.vs.voc")
+pct_threshold <- 0.75
+pd <- new("AnnotatedDataFrame", data = pheno)
+inpData <- ExpressionSet(assayData = gct, phenoData = pd)
+#Need an "Expression Set" Object as input
+#pvcaObj <- pvcaBatchAssess (gct, batch.factors, pct_threshold)
+#pvcaObj <- pvcaBatchAssess(inpData, feature_col, pct_threshold)
+gibPlot1 <- pvcAnaly(inpData, pct_threshold, covariates) 
+
+# There was an issue using subject ID because calculating the interation between Subject ID and the other
+# covariates caused there to be more factors than observations (255*2 > 267)
+pvcaObj <- pvcaBatchAssess(inpData, covariates, pct_threshold)
+bp <- barplot(pvcaObj$dat,
+              ylab = "Variance explained",
+              ylim= c(0,1.1),col = c("blue"), las=2,
+              main="PVCA estimation bar chart")
+axis(1, at = bp, labels = pvcaObj$label, xlab = "Effects", cex.axis = 0.5, las=2)
+values = pvcaObj$dat
+new_values = round(values , 3)
+text(bp,pvcaObj$dat,labels = new_values, pos=3, cex = 0.8)
+
+
+##################### SVA Analysis ########################################
+## Non-gibson version
+### Make formulas for modeling matrix in next step. Useful for when using large numbers of features
 ###########!!!!!!!!!!!!!!Issue occuring with the "%" sign in column names
 regform <- as.formula(paste("~ ", paste(names(pheno),collapse="+")))
 regform2 <- as.formula(paste("~ ", paste(names(pheno)[-6],collapse="+")))
-# ~CD71 + CD71_Batch + SEX + RACE + ETHNICITY + HGB
+#Example output: ~CD71 + CD71_Batch + SEX + RACE + ETHNICITY + HGB
 
-# Model matrices
+### Model matrices
 # NWGC ID and RACE were causing issues with sva due to error: "Lapack routine dgesv: system is exactly singular: U[197,197] = 0"
-mod = model.matrix(~ CD71 +CD71_Batch + SEX + ETHNICITY + HGB, data=pheno)
-mod0 = model.matrix(~ CD71 +CD71_Batch + SEX  + ETHNICITY  ,data=pheno)
+#mod = model.matrix(~ Subject_ID + CD71_libprep_batch + Sex + baseline.vs.voc , data=pheno)
+#mod0 = model.matrix(~ Subject_ID + CD71_libprep_batch + Sex ,data=pheno)
+mod = model.matrix(~ CD71_libprep_batch + Sex + baseline.vs.voc , data=pheno)
+mod0 = model.matrix(~ CD71_libprep_batch + Sex ,data=pheno)
+
+mod = model.matrix(~ as.factor(baseline.vs.voc) , data=pheno)
+mod0 = model.matrix(~ 1 ,data=pheno)
+
+#mod = model.matrix(~ CD71_libprep_batch , data=pheno)
+#mod0 = model.matrix(~ CD71_libprep_batch ,data=pheno)
 
 #mod = model.matrix(~ CD71_Batch +SEX+ ETHNICITY + HGB, data=pheno)
 #mod0 = model.matrix(~ CD71_Batch +SEX+ETHNICITY ,data=pheno)
 
-# Determine number of surrogate variables to calculate manually
-#num.sv(gct,mod,method="leek")
+### Determine number of surrogate variables to calculate manually
+num.sv(gct,mod,method="leek")
+num.sv(gct,mod,method="be")
+### Run SVA; automatically determine number of surrogate variables to calculate
+sva.out <- sva(gct,mod,mod0, n.sv = 3)
 
-# Run SVA; automatically determine number of surrogate variables to calculate
-sva.out <- sva(gct,mod,mod0)
+##############  Determine relationship of surrogate variables to metadata ##########
+sv_vars = sva.out$sv
+pheno$sv1 <- sv_vars[,1]
+pheno$sv2 <- sv_vars[,2]
+pheno$sv3 <- sv_vars[,2]
+## Fit a generalized linear model for sv1
+glm.sv1 <- glm(sv1 ~ CD71_libprep_batch + Sex + baseline.vs.voc, data = pheno) 
+summary(glm.sv1)
+glm.sv2 <- glm(sv2 ~ CD71_libprep_batch + Sex + baseline.vs.voc, data = pheno) 
+summary(glm.sv2)
+glm.sv3 <- glm(sv3 ~ CD71_libprep_batch + Sex + baseline.vs.voc, data = pheno) 
+summary(glm.sv3)
+coef(summary(glm.sv1))[,4]
+
+######### PVCA including surrogate variables
+pct_threshold <- 0.75
+pd2 <- new("AnnotatedDataFrame", data = pheno)
+inpData <- ExpressionSet(assayData = gct, phenoData = pd2)
+
+var_names <- c("sv1", "sv2", "sv3")
+pData(inpData)<-conTocat(pData(inpData), var_names) 
+covariates <- c("CD71_libprep_batch", "Sex", "baseline.vs.voc", "sv1_cat", "sv2_cat", "sv3_cat")
+
+pvcaObj <- pvcaBatchAssess(inpData, covariates, pct_threshold)
+gibPlot2 <- pvcAnaly(inpData, pct_threshold, covariates) # Residual: 0.752 > 0.739
+
+# Graph variance explained
+bp <- barplot(pvcaObj$dat,
+              ylab = "Variance explained",
+              ylim= c(0,1.1),col = c("blue"), las=2,
+              main="PVCA estimation bar chart")
+axis(1, at = bp, labels = pvcaObj$label, xlab = "Effects", cex.axis = 0.5, las=2)
+values = pvcaObj$dat
+new_values = round(values , 3)
+text(bp,pvcaObj$dat,labels = new_values, pos=3, cex = 0.8)
+
+#pheno <- pheno
+pheno$sv1 <- sva.out$sv[,1]
+inpData <- expSetobj(gct, pheno)
+var_names <- c("sv1") 
+pData(inpData)<-conTocat(pData(inpData), var_names) 
+cvrts_eff_var <- c("Subject_ID","CD71_libprep_batch","Sex","baseline.vs.voc", "sv1")
+pvcAnaly(inpData, pct_threshold, cvrts_eff_var)
+
+
+############## SNM Analysis #############################
+# Extract the surrogate variables from the 'sv' object
+sv_vars = sva.out$sv
+
+# Use the 'snm()' function to normalize the count matrix using the surrogate variables
+#norm_counts = snm(gct, bio.var=pheno ,adj.var=sv_vars)
+
+# Test
+# Create model matrices for the biological variable and adjustment variable
+#bio.var.mod = model.matrix(~ CD71_libprep_batch , data=pheno)
+#adj.var.mod = model.matrix(~sv_vars)
+bio.var.mod = model.matrix(~ Sex + baseline.vs.voc, data=pheno)
+adj.var.mod = model.matrix(~ CD71_libprep_batch + sv_vars, data = pheno)
+
+# Normalize the count matrix using the biological variable and adjustment variable model matrices
+#norm_counts = snm(gct, bio.var=bio.var.mod, adj.var=adj.var.mod)
+norm_counts = snm(gct, bio.var=bio.var.mod, adj.var=adj.var.mod, rm.adj=T)
+summary(norm_counts)
+#ks.test(norm_counts$pval, "punif")
+
+######### Enrichment Analysis ############################
+library(qvalue)
+
+
+# Calculate q-values and order from smallest to largest
+q <- qvalue(norm_counts$pval)
+deg <- data.frame("gene" = row.names(gct), "qval" = q$qvalues, "pval" = q$pvalues)
+deg <- deg[order(deg$qval),]
+
+
+
+### Print top DEGs
+# Below bonferroni threshold
+bonferroni_cutoff <- .05/nrow(gct)
+counter <- 0 
+for (i in 1:nrow(deg)) {
+  if(deg$pval[i]<bonferroni_cutoff){
+    counter <- counter +1
+    cat(deg$gene[i], "\n")
+  }
+}
+
+# Based on q-value
+number_of_DEG <- 187
+for (i in 1:number_of_DEG) {
+  cat(deg$gene[i], "\n")
+}
