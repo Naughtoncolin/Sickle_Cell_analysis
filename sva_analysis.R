@@ -5,6 +5,7 @@ library(sva)
 library(snm)
 library(pvca)
 library(Biobase)
+library(ExpressionNormalizationWorkflow)
 
 ########### Prep metadata ####################################
 pheno <- readxl::read_xlsx("../pain-omics-phenotype/Pain omics Phenotype_230112.xlsx", 
@@ -80,35 +81,36 @@ pheno$Subject_ID <- as.factor(pheno$Subject_ID)
 #pheno$CD71_Batch <- as.factor(pheno$CD71_Batch)
 
 ########### Prep gene count matrix ##########################
-#gct <- read.table("CD71_tpm_counts_log2_subset.gct", header = T, check.names = F )
 gct <- read.table("cd71_tpm_counts.gct", header = T, check.names = F)
 #gct2 <- gct
 gct <- gct2
-
 
 # Remove rows where gene name is a duplicate (why are they present?) and remove gene name column
 gct <- gct[!duplicated(gct$Description),]
 rownames(gct) <- gct$Description
 gct <- gct[,-1]
 
-###Filter lowly expressed genes
-threshold <- 0.1
-n_samples <- ncol(gct)
-# remove genes that are not expressed in at least 10% of samples
-gct <- gct[which(rowSums(gct > 0)/n_samples >= threshold), ]
-
 # Remove sample not found in metadata and order the count matrix with respect to the metadata
 cols_to_keep <- colnames(gct) %in% rownames(pheno)
 gct <- gct[, cols_to_keep]
 gct <- gct[, order(match(colnames(gct), rownames(pheno)))]
 
+# Remove genes that are not expressed in at least 10% of samples
+threshold <- 0.1
+gct <- gct[which(rowSums(gct > 0)/ncol(gct) >= threshold), ]
+
+# Remove genes where counts are zero for all samples
+#gct <- gct[which(rowSums(gct) != 0),]
+
+# Remove genes where count average is <= 1 TPM
+gct <- gct[which(rowSums(gct)/ncol(gct) > 1), ]
+
+# Log2(1+X) transform the count matrix
+gct <- apply(gct, 2, function(x) log2(x+1))
+
 # SVA doesn't allow data frames, must convert to matrix.
 gct <- as.matrix(gct)
 
-# Remove genes where counts are zero for all samples
-gct <- gct[which(rowSums(gct) != 0),]
-
-gct <- apply(gct, 2, function(x) log2(x+1))
 
 ##################### PVCA with original covariates #################
 #covariates <- c("Subject_ID", "CD71_libprep_batch", "Sex", "baseline.vs.voc")
@@ -160,7 +162,8 @@ mod0 = model.matrix(~ 1 ,data=pheno)
 
 ### Determine number of surrogate variables to calculate manually
 num.sv(gct,mod,method="leek")
-num.sv(gct,mod,method="be")
+#num.sv(gct,mod,method="be")
+
 ### Run SVA; automatically determine number of surrogate variables to calculate
 sva.out <- sva(gct,mod,mod0, n.sv = 3)
 
@@ -252,7 +255,7 @@ for (i in 1:nrow(deg)) {
 }
 
 # Based on q-value
-number_of_DEG <- 187
+number_of_DEG <- 794
 for (i in 1:number_of_DEG) {
   cat(deg$gene[i], "\n")
 }
