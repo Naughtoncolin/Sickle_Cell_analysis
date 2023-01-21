@@ -25,6 +25,8 @@ for(j in 1:nrow(lab.measurements)){
     lab.measurements$DOB[j] <- format(date_object, format = "%Y-%m-%d")
   }
 }
+
+# Add basic metadata feaures from lab measurements file
 for(i in 1:nrow(pain)){
   if(!is.na(pain$Investigator.RNA.Plasma.ID[i])){
     for(j in 1:nrow(lab.measurements)){
@@ -34,6 +36,7 @@ for(i in 1:nrow(pain)){
         pain$Race[i] <- lab.measurements$RACE[j]
         pain$Ethnicity[i] <- lab.measurements$ETHNICITY[j]
         pain$Sex[i] <- lab.measurements$SEX[j]
+        pain$Blood_collection_date[i] <- lab.measurements$TORID_1_Date_of_collection[j]
       } else if(!is.na(lab.measurements$Sample.ID_2[j])){
         if(pain$Investigator.RNA.Plasma.ID[i] == lab.measurements$Sample.ID_2[j]){
           pain$MRN[i] <- lab.measurements$MRN[j]
@@ -41,6 +44,7 @@ for(i in 1:nrow(pain)){
           pain$Race[i] <- lab.measurements$RACE[j]
           pain$Ethnicity[i] <- lab.measurements$ETHNICITY[j]
           pain$Sex[i] <- lab.measurements$SEX[j]
+          pain$Blood_collection_date[i] <- lab.measurements$TORID_2_Date_of_collection[j]
         }
       } else if(!is.na(lab.measurements$Sample_3[j])){
         if(pain$Investigator.RNA.Plasma.ID[i] == lab.measurements$Sample_3[j]){
@@ -49,6 +53,7 @@ for(i in 1:nrow(pain)){
           pain$Race[i] <- lab.measurements$RACE[j]
           pain$Ethnicity[i] <- lab.measurements$ETHNICITY[j]
           pain$Sex[i] <- lab.measurements$SEX[j]
+          pain$Blood_collection_date[i] <- lab.measurements$TORID_3_Date_of_collection[j]
         }
       }        
     }
