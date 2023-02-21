@@ -8,7 +8,7 @@ library(Biobase)
 library(ExpressionNormalizationWorkflow)
 
 ########### Prep metadata ####################################
-pheno <- readxl::read_xlsx("../pain-omics-phenotype/Pain omics Phenotype_230112.xlsx", 
+pheno <- readxl::read_xlsx("../pain-omics-phenotype/Pain omics Phenotype_230122.xlsx", 
                            sheet = "TORIDs Passing QC with measurem")
 pheno <- as.data.frame(pheno)
 
@@ -52,20 +52,18 @@ pheno$CD71_NWGC_ID <- NULL
 
 # Select 10 random rows for each "Baseline" and "Inpatient VOC" group
 #pheno <- pheno %>%
-select(CD71_NWGC_ID, Subject_ID, baseline.vs.voc, CD71_libprep_batch, Sex) %>%
-  group_by(baseline.vs.voc) %>% 
-  distinct(Subject_ID, .keep_all = T) %>%
-  sample_n(10) %>%
-  ungroup() %>%
-  as.data.frame()
+# select(CD71_NWGC_ID, Subject_ID, baseline.vs.voc, CD71_libprep_batch, Sex) %>%
+#   group_by(baseline.vs.voc) %>% 
+#   distinct(Subject_ID, .keep_all = T) %>%
+#   sample_n(10) %>%
+#   ungroup() %>%
+#   as.data.frame()
+
 #ids <- as.character(pheno$CD71_NWGC_ID)
 #pheno$CD71_NWGC_ID <- NULL
 #row.names(pheno) <- ids
-row.names(pheno) <- pheno$CD71_NWGC_ID
-pheno$CD71_NWGC_ID <- NULL
-
-
-
+#row.names(pheno) <- pheno$CD71_NWGC_ID
+#pheno$CD71_NWGC_ID <- NULL
 
 # Change metadata character columns to factors
 pheno[] <- lapply(pheno, function(x) {
@@ -84,12 +82,16 @@ pheno$Subject_ID <- as.factor(pheno$Subject_ID)
 ########### Prep gene count matrix ##########################
 gct <- read.table("cd71_tpm_counts.gct", header = T, check.names = F)
 #gct2 <- gct
-gct <- gct2
+#gct <- gct2
+
 
 # Remove rows where gene name is a duplicate (why are they present?) and remove gene name column
 gct <- gct[!duplicated(gct$Description),]
 rownames(gct) <- gct$Description
 gct <- gct[,-1]
+
+# Remove ERCC transcripts
+gct <- gct[!startsWith(row.names(gct), "ERCC-"), ]
 
 # Remove sample not found in metadata and order the count matrix with respect to the metadata
 cols_to_keep <- colnames(gct) %in% rownames(pheno)
@@ -97,20 +99,22 @@ gct <- gct[, cols_to_keep]
 gct <- gct[, order(match(colnames(gct), rownames(pheno)))]
 
 # Remove genes that are not expressed in at least 10% of samples
-threshold <- 0.1
+threshold <- 0.05
 gct <- gct[which(rowSums(gct > 0)/ncol(gct) >= threshold), ]
 
 # Remove genes where counts are zero for all samples
 #gct <- gct[which(rowSums(gct) != 0),]
 
 # Remove genes where count average is <= 1 TPM
-gct <- gct[which(rowSums(gct)/ncol(gct) > 1), ]
+gct <- gct[which(rowSums(gct)/ncol(gct) > .1), ]
+#gct <- gct[which(rowSums(gct)/ncol(gct) > 1), ]
+
 
 # Log2(1+X) transform the count matrix
 gct <- apply(gct, 2, function(x) log2(x+1))
 
 # SVA doesn't allow data frames, must convert to matrix.
-gct <- as.matrix(gct)
+#gct <- as.matrix(gct)
 
 
 ##################### PVCA with original covariates #################
@@ -127,23 +131,24 @@ gibPlot1 <- pvcAnaly(inpData, pct_threshold, covariates)
 
 # There was an issue using subject ID because calculating the interation between Subject ID and the other
 # covariates caused there to be more factors than observations (255*2 > 267)
-pvcaObj <- pvcaBatchAssess(inpData, covariates, pct_threshold)
-bp <- barplot(pvcaObj$dat,
-              ylab = "Variance explained",
-              ylim= c(0,1.1),col = c("blue"), las=2,
-              main="PVCA estimation bar chart")
-axis(1, at = bp, labels = pvcaObj$label, xlab = "Effects", cex.axis = 0.5, las=2)
-values = pvcaObj$dat
-new_values = round(values , 3)
-text(bp,pvcaObj$dat,labels = new_values, pos=3, cex = 0.8)
+
+# pvcaObj <- pvcaBatchAssess(inpData, covariates, pct_threshold)
+# bp <- barplot(pvcaObj$dat,
+#               ylab = "Variance explained",
+#               ylim= c(0,1.1),col = c("blue"), las=2,
+#               main="PVCA estimation bar chart")
+# axis(1, at = bp, labels = pvcaObj$label, xlab = "Effects", cex.axis = 0.5, las=2)
+# values = pvcaObj$dat
+# new_values = round(values , 3)
+# text(bp,pvcaObj$dat,labels = new_values, pos=3, cex = 0.8)
 
 
 ##################### SVA Analysis ########################################
 ## Non-gibson version
 ### Make formulas for modeling matrix in next step. Useful for when using large numbers of features
 ###########!!!!!!!!!!!!!!Issue occuring with the "%" sign in column names
-regform <- as.formula(paste("~ ", paste(names(pheno),collapse="+")))
-regform2 <- as.formula(paste("~ ", paste(names(pheno)[-6],collapse="+")))
+#regform <- as.formula(paste("~ ", paste(names(pheno),collapse="+")))
+#regform2 <- as.formula(paste("~ ", paste(names(pheno)[-6],collapse="+")))
 #Example output: ~CD71 + CD71_Batch + SEX + RACE + ETHNICITY + HGB
 
 ### Model matrices
@@ -151,10 +156,10 @@ regform2 <- as.formula(paste("~ ", paste(names(pheno)[-6],collapse="+")))
 #mod = model.matrix(~ Subject_ID + CD71_libprep_batch + Sex + baseline.vs.voc , data=pheno)
 #mod0 = model.matrix(~ Subject_ID + CD71_libprep_batch + Sex ,data=pheno)
 mod = model.matrix(~ CD71_libprep_batch + Sex + Chronic.Pain. + steadyState.vs.voc , data=pheno)
-mod0 = model.matrix(~ CD71_libprep_batch + Sex ,data=pheno)
+mod0 = model.matrix(~ CD71_libprep_batch + Sex + Chronic.Pain.,data=pheno)
 
-mod = model.matrix(~ as.factor(baseline.vs.voc) , data=pheno)
-mod0 = model.matrix(~ 1 ,data=pheno)
+#mod = model.matrix(~ as.factor(baseline.vs.voc) , data=pheno)
+#mod0 = model.matrix(~ 1 ,data=pheno)
 
 #mod = model.matrix(~ CD71_libprep_batch , data=pheno)
 #mod0 = model.matrix(~ CD71_libprep_batch ,data=pheno)
@@ -163,11 +168,11 @@ mod0 = model.matrix(~ 1 ,data=pheno)
 #mod0 = model.matrix(~ CD71_Batch +SEX+ETHNICITY ,data=pheno)
 
 ### Determine number of surrogate variables to calculate manually
-num.sv(gct,mod,method="leek")
+n.sv <- num.sv(gct,mod,method="leek")
 #num.sv(gct,mod,method="be")
 
 ### Run SVA; automatically determine number of surrogate variables to calculate
-sva.out <- sva(gct,mod,mod0, n.sv = 3)
+sva.out <- sva(gct,mod,mod0, n.sv = n.sv)
 
 ##############  Determine relationship of surrogate variables to metadata ##########
 sv_vars = sva.out$sv
@@ -184,34 +189,48 @@ summary(glm.sv3)
 coef(summary(glm.sv1))[,4]
 
 ######### PVCA including surrogate variables
+#pheno2 <- pheno
+#pheno <- pheno2
 pct_threshold <- 0.75
 pd2 <- new("AnnotatedDataFrame", data = pheno)
 inpData <- ExpressionSet(assayData = gct, phenoData = pd2)
 
-var_names <- c("sv1", "sv2", "sv3")
-pData(inpData)<-conTocat(pData(inpData), var_names) 
-covariates <- c("CD71_libprep_batch", "Sex", "baseline.vs.voc", "sv1_cat", "sv2_cat", "sv3_cat")
+# conTocat requires two things in the list.
+# Tried to use it on inpData, but wouldn't allow duplicate columns.
+# Instead used on pheno, which was then used to make inpData variable
+#var_names <- c("sv1", "sv2", "sv3")
+var_names <- c("sv1", "sv1")
+pheno<-conTocat(pheno, var_names)
 
-pvcaObj <- pvcaBatchAssess(inpData, covariates, pct_threshold)
+#Only use when 1 SV
+pheno <- pheno[,-ncol(pheno)]
+pd2 <- new("AnnotatedDataFrame", data = pheno)
+inpData <- ExpressionSet(assayData = gct, phenoData = pd2)
+
+#pData(inpData)<-conTocat(pData(inpData), var_names) 
+#covariates <- c("CD71_libprep_batch", "Sex", "baseline.vs.voc", "sv1_cat", "sv2_cat", "sv3_cat")
+covariates <- c("CD71_libprep_batch", "Sex", "steadyState.vs.voc", "Chronic.Pain.", "sv1_cat")
+
+#pvcaObj <- pvcaBatchAssess(inpData, covariates, pct_threshold)
 gibPlot2 <- pvcAnaly(inpData, pct_threshold, covariates) # Residual: 0.752 > 0.739
 
 # Graph variance explained
-bp <- barplot(pvcaObj$dat,
-              ylab = "Variance explained",
-              ylim= c(0,1.1),col = c("blue"), las=2,
-              main="PVCA estimation bar chart")
-axis(1, at = bp, labels = pvcaObj$label, xlab = "Effects", cex.axis = 0.5, las=2)
-values = pvcaObj$dat
-new_values = round(values , 3)
-text(bp,pvcaObj$dat,labels = new_values, pos=3, cex = 0.8)
+# bp <- barplot(pvcaObj$dat,
+#               ylab = "Variance explained",
+#               ylim= c(0,1.1),col = c("blue"), las=2,
+#               main="PVCA estimation bar chart")
+# axis(1, at = bp, labels = pvcaObj$label, xlab = "Effects", cex.axis = 0.5, las=2)
+# values = pvcaObj$dat
+# new_values = round(values , 3)
+# text(bp,pvcaObj$dat,labels = new_values, pos=3, cex = 0.8)
 
 #pheno <- pheno
-pheno$sv1 <- sva.out$sv[,1]
-inpData <- expSetobj(gct, pheno)
-var_names <- c("sv1") 
-pData(inpData)<-conTocat(pData(inpData), var_names) 
-cvrts_eff_var <- c("Subject_ID","CD71_libprep_batch","Sex","baseline.vs.voc", "sv1")
-pvcAnaly(inpData, pct_threshold, cvrts_eff_var)
+# pheno$sv1 <- sva.out$sv[,1]
+# inpData <- expSetobj(gct, pheno)
+# var_names <- c("sv1") 
+# pData(inpData)<-conTocat(pData(inpData), var_names) 
+# cvrts_eff_var <- c("Subject_ID","CD71_libprep_batch","Sex","baseline.vs.voc", "sv1")
+# pvcAnaly(inpData, pct_threshold, cvrts_eff_var)
 
 
 ############## SNM Analysis #############################
@@ -247,21 +266,23 @@ q <- qvalue(norm_counts$pval)
 deg <- data.frame("gene" = row.names(gct), "qval" = q$qvalues, "pval" = q$pvalues)
 deg <- deg[order(deg$qval),]
 
-
+number_of_DEG <- 3778
 
 ### Print top DEGs
 # Below bonferroni threshold
-bonferroni_cutoff <- .05/nrow(gct)
-counter <- 0 
-for (i in 1:nrow(deg)) {
-  if(deg$pval[i]<bonferroni_cutoff){
-    counter <- counter +1
-    cat(deg$gene[i], "\n")
-  }
-}
+# bonferroni_cutoff <- .05/nrow(gct)
+# counter <- 0 
+# for (i in 1:nrow(deg)) {
+#   if(deg$pval[i]<bonferroni_cutoff){
+#     counter <- counter +1
+#     cat(deg$gene[i], "\n")
+#   }
+# }
 
 # Based on q-value
-number_of_DEG <- 794
-for (i in 1:number_of_DEG) {
-  cat(deg$gene[i], "\n")
-}
+# for (i in 1:number_of_DEG) {
+#   cat(deg$gene[i], "\n")
+# }
+top_found_genes <- deg[1:number_of_DEG,"gene"]
+write.table(top_found_genes, file = "found_genes_12k_1e-04.txt", row.names = F, col.names = F, quote = F)
+  
