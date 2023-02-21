@@ -27,16 +27,17 @@ pheno <- na.omit(pheno)
 
 # Make metadata column grouping points\
 base <- c("Baseline", "HU", "HU MTD", "Metformin Baseline", "Metformin", "Metformin MTD")
-pheno$baseline.vs.voc <- ifelse(pheno$Timepoint..at.RNA.collection. %in% base, "Baseline", pheno$Timepoint..at.RNA.collection.)
-pheno <- pheno[which(pheno$baseline.vs.voc!="Inpatient F/U"),] # Get id of VOC F/U
-pheno$Timepoint..at.RNA.collection. <- NULL
+#pheno$baseline.vs.voc <- ifelse(pheno$Timepoint..at.RNA.collection. %in% base, "Baseline", pheno$Timepoint..at.RNA.collection.)
+pheno$steadyState.vs.voc <- ifelse(pheno$Timepoint..at.RNA.collection. %in% base, "Steady State", pheno$Timepoint..at.RNA.collection.)
+pheno <- pheno[which(pheno$steadyState.vs.voc!="Inpatient F/U"),] # Get id of VOC F/U
+#pheno$Timepoint..at.RNA.collection. <- NULL
 
 
 #Subset to unique individuals with baseline & VOC
 # There are still duplicates accross the two categories
 pheno <- pheno %>% 
-  select(CD71_NWGC_ID, Subject_ID, baseline.vs.voc, CD71_libprep_batch, Sex, Chronic.Pain.) %>%
-  group_by(baseline.vs.voc) %>% 
+  select(CD71_NWGC_ID, Subject_ID, steadyState.vs.voc, Timepoint..at.RNA.collection., CD71_libprep_batch, Sex, Chronic.Pain.) %>%
+  group_by(steadyState.vs.voc) %>% 
   distinct(Subject_ID, .keep_all = T) %>%
   ungroup() %>%
   as.data.frame()
@@ -114,7 +115,8 @@ gct <- as.matrix(gct)
 
 ##################### PVCA with original covariates #################
 #covariates <- c("Subject_ID", "CD71_libprep_batch", "Sex", "baseline.vs.voc")
-covariates <- c("CD71_libprep_batch", "Sex", "baseline.vs.voc")
+#covariates <- c("CD71_libprep_batch", "Sex", "baseline.vs.voc" )
+covariates <- c("CD71_libprep_batch", "Sex", "steadyState.vs.voc", "Chronic.Pain.")
 pct_threshold <- 0.75
 pd <- new("AnnotatedDataFrame", data = pheno)
 inpData <- ExpressionSet(assayData = gct, phenoData = pd)
@@ -148,7 +150,7 @@ regform2 <- as.formula(paste("~ ", paste(names(pheno)[-6],collapse="+")))
 # NWGC ID and RACE were causing issues with sva due to error: "Lapack routine dgesv: system is exactly singular: U[197,197] = 0"
 #mod = model.matrix(~ Subject_ID + CD71_libprep_batch + Sex + baseline.vs.voc , data=pheno)
 #mod0 = model.matrix(~ Subject_ID + CD71_libprep_batch + Sex ,data=pheno)
-mod = model.matrix(~ CD71_libprep_batch + Sex + baseline.vs.voc , data=pheno)
+mod = model.matrix(~ CD71_libprep_batch + Sex + Chronic.Pain. + steadyState.vs.voc , data=pheno)
 mod0 = model.matrix(~ CD71_libprep_batch + Sex ,data=pheno)
 
 mod = model.matrix(~ as.factor(baseline.vs.voc) , data=pheno)
@@ -173,11 +175,11 @@ pheno$sv1 <- sv_vars[,1]
 pheno$sv2 <- sv_vars[,2]
 pheno$sv3 <- sv_vars[,2]
 ## Fit a generalized linear model for sv1
-glm.sv1 <- glm(sv1 ~ CD71_libprep_batch + Sex + baseline.vs.voc, data = pheno) 
+glm.sv1 <- glm(sv1 ~ CD71_libprep_batch + Sex + steadyState.vs.voc, data = pheno) 
 summary(glm.sv1)
-glm.sv2 <- glm(sv2 ~ CD71_libprep_batch + Sex + baseline.vs.voc, data = pheno) 
+glm.sv2 <- glm(sv2 ~ CD71_libprep_batch + Sex + steadyState.vs.voc, data = pheno) 
 summary(glm.sv2)
-glm.sv3 <- glm(sv3 ~ CD71_libprep_batch + Sex + baseline.vs.voc, data = pheno) 
+glm.sv3 <- glm(sv3 ~ CD71_libprep_batch + Sex + steadyState.vs.voc, data = pheno) 
 summary(glm.sv3)
 coef(summary(glm.sv1))[,4]
 
@@ -223,13 +225,17 @@ sv_vars = sva.out$sv
 # Create model matrices for the biological variable and adjustment variable
 #bio.var.mod = model.matrix(~ CD71_libprep_batch , data=pheno)
 #adj.var.mod = model.matrix(~sv_vars)
-bio.var.mod = model.matrix(~ Sex + baseline.vs.voc, data=pheno)
-adj.var.mod = model.matrix(~ CD71_libprep_batch + sv_vars, data = pheno)
+
+#bio.var.mod = model.matrix(~ Sex + steadyState.vs.voc + Chronic.Pain., data=pheno)
+#adj.var.mod = model.matrix(~ CD71_libprep_batch + sv_vars, data = pheno)
+
+bio.var.mod = model.matrix(~  steadyState.vs.voc , data=pheno)
+adj.var.mod = model.matrix(~ Sex + CD71_libprep_batch + sv1 + Chronic.Pain., data = pheno)
 
 # Normalize the count matrix using the biological variable and adjustment variable model matrices
 #norm_counts = snm(gct, bio.var=bio.var.mod, adj.var=adj.var.mod)
 norm_counts = snm(gct, bio.var=bio.var.mod, adj.var=adj.var.mod, rm.adj=T)
-summary(norm_counts)
+head(summary(norm_counts))
 #ks.test(norm_counts$pval, "punif")
 
 ######### Enrichment Analysis ############################
