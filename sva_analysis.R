@@ -186,30 +186,9 @@ pvcaPlot2 <- pvcAnaly(inpData, pct_threshold, covariates)
 # new_values = round(values , 3)
 # text(bp,pvcaObj$dat,labels = new_values, pos=3, cex = 0.8)
 
-#pheno <- pheno
-# pheno$sv1 <- sva.out$sv[,1]
-# inpData <- expSetobj(gct, pheno)
-# var_names <- c("sv1") 
-# pData(inpData)<-conTocat(pData(inpData), var_names) 
-# cvrts_eff_var <- c("Subject_ID","CD71_libprep_batch","Sex","baseline.vs.voc", "sv1")
-# pvcAnaly(inpData, pct_threshold, cvrts_eff_var)
 
 ############################### SNM Analysis #####################################
 # Create model matrices for the biological variables of interest and adjustment variables
-# Extract the surrogate variables from the 'sv' object
-sv_vars = sva.out$sv
-
-# Use the 'snm()' function to normalize the count matrix using the surrogate variables
-#norm_counts = snm(gct, bio.var=pheno ,adj.var=sv_vars)
-
-# Test
-# Create model matrices for the biological variable and adjustment variable
-#bio.var.mod = model.matrix(~ CD71_libprep_batch , data=pheno)
-#adj.var.mod = model.matrix(~sv_vars)
-
-#bio.var.mod = model.matrix(~ Sex + steadyState.vs.voc + Chronic.Pain., data=pheno)
-#adj.var.mod = model.matrix(~ CD71_libprep_batch + sv_vars, data = pheno)
-
 bio.var.mod = model.matrix(~  steadyState.vs.voc , data=pheno)
 adj.var.mod = model.matrix(~ Sex + CD71_libprep_batch + sv1 + Chronic.Pain., data = pheno)
 
