@@ -166,6 +166,9 @@ pheno<-conTocat(pheno, var_names)
 # Only use when there is one surrogate variable; it will remove the extra column
 # that was added.
 pheno <- pheno[,-ncol(pheno)]
+
+covariates <- c("CD71_libprep_batch", "Sex", "steadyState.vs.voc", "Chronic.Pain.", "sv1_cat")
+pct_threshold <- 0.75
 pd2 <- new("AnnotatedDataFrame", data = pheno)
 inpData <- ExpressionSet(assayData = gct, phenoData = pd2)
 
@@ -173,9 +176,7 @@ inpData <- ExpressionSet(assayData = gct, phenoData = pd2)
 pvcaPlot2 <- pvcAnaly(inpData, pct_threshold, covariates)
 
 # Make PVCA plot but include interactions between covariates
-gibPlot2 <- pvcAnaly(inpData, pct_threshold, covariates) # Residual: 0.752 > 0.739
-
-# Graph variance explained
+# pvcaObj <- pvcaBatchAssess(inpData, covariates, pct_threshold)
 # bp <- barplot(pvcaObj$dat,
 #               ylab = "Variance explained",
 #               ylim= c(0,1.1),col = c("blue"), las=2,
