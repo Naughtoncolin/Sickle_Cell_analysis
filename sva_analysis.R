@@ -131,10 +131,10 @@ n.sv <- num.sv(gct,mod,method="leek")
 sva.out <- sva(gct,mod,mod0, n.sv = n.sv)
 
 ##############  Determine relationship of surrogate variables to metadata ##########
-sv_vars = sva.out$sv
-pheno$sv1 <- sv_vars[,1]
-pheno$sv2 <- sv_vars[,2]
-pheno$sv3 <- sv_vars[,2]
+# Add surrogate variables to metadata
+pheno$sv1 <- sva.out$sv[,1]
+#pheno$sv2 <- sva.out$sv[,2]
+#pheno$sv3 <- sva.out$sv[,2]
 ## Fit a generalized linear model for sv1
 glm.sv1 <- glm(sv1 ~ CD71_libprep_batch + Sex + steadyState.vs.voc, data = pheno) 
 summary(glm.sv1)
