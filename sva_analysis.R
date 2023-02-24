@@ -218,6 +218,9 @@ norm_counts = snm(gct, bio.var=bio.var.mod, adj.var=adj.var.mod, rm.adj=T)
 head(summary(norm_counts))
 #ks.test(norm_counts$pval, "punif")
 
+# Save SNM normalized matrix
+#saveRDS(norm_counts$norm.dat, file = "SNM_normalized_cd71_baselinevsvoc.gct.rds")
+
 ######### Enrichment Analysis ############################
 library(qvalue)
 
