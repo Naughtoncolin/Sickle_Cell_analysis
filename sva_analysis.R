@@ -65,7 +65,9 @@ pheno$Subject_ID <- as.factor(pheno$Subject_ID)
 
 
 ########### Prep gene count matrix ##########################
-gct <- read.table("cd71_tpm_counts.gct", header = T, check.names = F)
+#gct <- read.table("cd71_tpm_counts.gct", header = T, check.names = F)
+gct <- read.table(gzfile("../../pharmhu/aggregate_files/pharmhu_topmed_to5_rnaseq_gene_tpm.gct.gz"), 
+                  header = T, check.names = F, skip = 2)
 #gct2 <- gct
 #gct <- gct2
 
@@ -73,7 +75,9 @@ gct <- read.table("cd71_tpm_counts.gct", header = T, check.names = F)
 # Remove rows where gene name is a duplicate (why are they present?) and remove gene name column
 gct <- gct[!duplicated(gct$Description),]
 rownames(gct) <- gct$Description
-gct <- gct[,-1]
+gct <- gct[,-c(1,2)]
+#gct <- gct[,-1] #Keeping for testing purposes so no need to unzip count matrix
+
 
 # Remove ERCC transcripts
 gct <- gct[!startsWith(row.names(gct), "ERCC-"), ]
