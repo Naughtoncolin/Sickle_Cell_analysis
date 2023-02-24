@@ -16,8 +16,6 @@ pheno <- as.data.frame(pheno)
 pheno <- pheno[!is.na(pheno$CD71_NWGC_ID),]
 
 #Select columns for downstream analysis
-#feature_col <- c("CD71_libprep_batch", "Investigator.Sex", "Timepoint..at.RNA.collection.")
-#feature_col <- c("CD71_NWGC_ID", "Subject_ID", "CD71_libprep_batch", "Sex", "Timepoint..at.RNA.collection.")
 feature_col <- c("CD71_NWGC_ID", "Subject_ID", "CD71_libprep_batch", "Sex", "Timepoint..at.RNA.collection.", "Chronic.Pain.")
 pheno <- pheno %>% select(any_of(feature_col))
 
@@ -27,10 +25,8 @@ pheno <- na.omit(pheno)
 
 # Make metadata column grouping points\
 base <- c("Baseline", "HU", "HU MTD", "Metformin Baseline", "Metformin", "Metformin MTD")
-#pheno$baseline.vs.voc <- ifelse(pheno$Timepoint..at.RNA.collection. %in% base, "Baseline", pheno$Timepoint..at.RNA.collection.)
 pheno$steadyState.vs.voc <- ifelse(pheno$Timepoint..at.RNA.collection. %in% base, "Steady State", pheno$Timepoint..at.RNA.collection.)
 pheno <- pheno[which(pheno$steadyState.vs.voc!="Inpatient F/U"),] # Get id of VOC F/U
-#pheno$Timepoint..at.RNA.collection. <- NULL
 
 
 #Subset to unique individuals with baseline & VOC
@@ -43,9 +39,6 @@ pheno <- pheno %>%
   as.data.frame()
 row.names(pheno) <- pheno$CD71_NWGC_ID
 pheno$CD71_NWGC_ID <- NULL
-#ids <- as.character(pheno$CD71_NWGC_ID)
-#pheno$CD71_NWGC_ID <- NULL
-#row.names(pheno) <- ids
 
 #Change metadata to numeric for numeric features
 #pheno$HGB <- as.numeric(sub(" .*", "", pheno$HGB))
@@ -59,13 +52,8 @@ pheno$CD71_NWGC_ID <- NULL
 #   ungroup() %>%
 #   as.data.frame()
 
-#ids <- as.character(pheno$CD71_NWGC_ID)
-#pheno$CD71_NWGC_ID <- NULL
-#row.names(pheno) <- ids
-#row.names(pheno) <- pheno$CD71_NWGC_ID
-#pheno$CD71_NWGC_ID <- NULL
-
 # Change metadata character columns to factors
+# This may need to be edited once more metadata features are used
 pheno[] <- lapply(pheno, function(x) {
   if (is.character(x)) {
     as.factor(x)
@@ -73,11 +61,8 @@ pheno[] <- lapply(pheno, function(x) {
     x
   }
 })
-#pheno$Subject_ID <- as.character(pheno$Subject_ID)
 pheno$Subject_ID <- as.factor(pheno$Subject_ID)
-#pheno$CD71_NWGC_ID <- as.factor(pheno$CD71_NWGC_ID)
-#pheno$CD71_libprep_batch <- as.factor(pheno$CD71_libprep_batch)
-#pheno$CD71_Batch <- as.factor(pheno$CD71_Batch)
+
 
 ########### Prep gene count matrix ##########################
 gct <- read.table("cd71_tpm_counts.gct", header = T, check.names = F)
@@ -113,38 +98,17 @@ gct <- gct[which(rowSums(gct)/ncol(gct) > .1), ]
 # Log2(1+X) transform the count matrix
 gct <- apply(gct, 2, function(x) log2(x+1))
 
-# SVA doesn't allow data frames, must convert to matrix.
-#gct <- as.matrix(gct)
-
-
 ##################### PVCA with original covariates #################
-#covariates <- c("Subject_ID", "CD71_libprep_batch", "Sex", "baseline.vs.voc")
-#covariates <- c("CD71_libprep_batch", "Sex", "baseline.vs.voc" )
 covariates <- c("CD71_libprep_batch", "Sex", "steadyState.vs.voc", "Chronic.Pain.")
 pct_threshold <- 0.75
 pd <- new("AnnotatedDataFrame", data = pheno)
 inpData <- ExpressionSet(assayData = gct, phenoData = pd)
-#Need an "Expression Set" Object as input
-#pvcaObj <- pvcaBatchAssess (gct, batch.factors, pct_threshold)
-#pvcaObj <- pvcaBatchAssess(inpData, feature_col, pct_threshold)
-gibPlot1 <- pvcAnaly(inpData, pct_threshold, covariates) 
 
-# There was an issue using subject ID because calculating the interation between Subject ID and the other
-# covariates caused there to be more factors than observations (255*2 > 267)
-
-# pvcaObj <- pvcaBatchAssess(inpData, covariates, pct_threshold)
-# bp <- barplot(pvcaObj$dat,
-#               ylab = "Variance explained",
-#               ylim= c(0,1.1),col = c("blue"), las=2,
-#               main="PVCA estimation bar chart")
-# axis(1, at = bp, labels = pvcaObj$label, xlab = "Effects", cex.axis = 0.5, las=2)
-# values = pvcaObj$dat
-# new_values = round(values , 3)
-# text(bp,pvcaObj$dat,labels = new_values, pos=3, cex = 0.8)
-
+# Make PVCA plot
+pvcaPlot1 <- pvcAnaly(inpData, pct_threshold, covariates) #Need an "Expression Set" Object as input
 
 ##################### SVA Analysis ########################################
-## Non-gibson version
+
 ### Make formulas for modeling matrix in next step. Useful for when using large numbers of features
 ###########!!!!!!!!!!!!!!Issue occuring with the "%" sign in column names
 #regform <- as.formula(paste("~ ", paste(names(pheno),collapse="+")))
@@ -152,20 +116,8 @@ gibPlot1 <- pvcAnaly(inpData, pct_threshold, covariates)
 #Example output: ~CD71 + CD71_Batch + SEX + RACE + ETHNICITY + HGB
 
 ### Model matrices
-# NWGC ID and RACE were causing issues with sva due to error: "Lapack routine dgesv: system is exactly singular: U[197,197] = 0"
-#mod = model.matrix(~ Subject_ID + CD71_libprep_batch + Sex + baseline.vs.voc , data=pheno)
-#mod0 = model.matrix(~ Subject_ID + CD71_libprep_batch + Sex ,data=pheno)
 mod = model.matrix(~ CD71_libprep_batch + Sex + Chronic.Pain. + steadyState.vs.voc , data=pheno)
 mod0 = model.matrix(~ CD71_libprep_batch + Sex + Chronic.Pain.,data=pheno)
-
-#mod = model.matrix(~ as.factor(baseline.vs.voc) , data=pheno)
-#mod0 = model.matrix(~ 1 ,data=pheno)
-
-#mod = model.matrix(~ CD71_libprep_batch , data=pheno)
-#mod0 = model.matrix(~ CD71_libprep_batch ,data=pheno)
-
-#mod = model.matrix(~ CD71_Batch +SEX+ ETHNICITY + HGB, data=pheno)
-#mod0 = model.matrix(~ CD71_Batch +SEX+ETHNICITY ,data=pheno)
 
 ### Determine number of surrogate variables to calculate manually
 n.sv <- num.sv(gct,mod,method="leek")
@@ -191,9 +143,6 @@ coef(summary(glm.sv1))[,4]
 ######### PVCA including surrogate variables
 #pheno2 <- pheno
 #pheno <- pheno2
-pct_threshold <- 0.75
-pd2 <- new("AnnotatedDataFrame", data = pheno)
-inpData <- ExpressionSet(assayData = gct, phenoData = pd2)
 
 # conTocat requires two things in the list.
 # Tried to use it on inpData, but wouldn't allow duplicate columns.
@@ -207,11 +156,10 @@ pheno <- pheno[,-ncol(pheno)]
 pd2 <- new("AnnotatedDataFrame", data = pheno)
 inpData <- ExpressionSet(assayData = gct, phenoData = pd2)
 
-#pData(inpData)<-conTocat(pData(inpData), var_names) 
-#covariates <- c("CD71_libprep_batch", "Sex", "baseline.vs.voc", "sv1_cat", "sv2_cat", "sv3_cat")
-covariates <- c("CD71_libprep_batch", "Sex", "steadyState.vs.voc", "Chronic.Pain.", "sv1_cat")
+# Make PVCA plot including surrogate variables
+pvcaPlot2 <- pvcAnaly(inpData, pct_threshold, covariates)
 
-#pvcaObj <- pvcaBatchAssess(inpData, covariates, pct_threshold)
+# Make PVCA plot but include interactions between covariates
 gibPlot2 <- pvcAnaly(inpData, pct_threshold, covariates) # Residual: 0.752 > 0.739
 
 # Graph variance explained
@@ -252,7 +200,7 @@ bio.var.mod = model.matrix(~  steadyState.vs.voc , data=pheno)
 adj.var.mod = model.matrix(~ Sex + CD71_libprep_batch + sv1 + Chronic.Pain., data = pheno)
 
 # Normalize the count matrix using the biological variable and adjustment variable model matrices
-#norm_counts = snm(gct, bio.var=bio.var.mod, adj.var=adj.var.mod)
+# NOTE: This leave negative values in the matrix!
 norm_counts = snm(gct, bio.var=bio.var.mod, adj.var=adj.var.mod, rm.adj=T)
 head(summary(norm_counts))
 #ks.test(norm_counts$pval, "punif")
