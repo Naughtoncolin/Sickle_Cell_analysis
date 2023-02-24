@@ -125,7 +125,7 @@ mod0 = model.matrix(~ CD71_libprep_batch + Sex + Chronic.Pain.,data=pheno)
 
 ### Determine number of surrogate variables to calculate manually
 n.sv <- num.sv(gct,mod,method="leek")
-#num.sv(gct,mod,method="be")
+#num.sv(gct,mod,method="be") #'be' method is older
 
 ### Run SVA; automatically determine number of surrogate variables to calculate
 sva.out <- sva(gct,mod,mod0, n.sv = n.sv)
@@ -135,27 +135,36 @@ sva.out <- sva(gct,mod,mod0, n.sv = n.sv)
 pheno$sv1 <- sva.out$sv[,1]
 #pheno$sv2 <- sva.out$sv[,2]
 #pheno$sv3 <- sva.out$sv[,2]
-## Fit a generalized linear model for sv1
-glm.sv1 <- glm(sv1 ~ CD71_libprep_batch + Sex + steadyState.vs.voc, data = pheno) 
-summary(glm.sv1)
-glm.sv2 <- glm(sv2 ~ CD71_libprep_batch + Sex + steadyState.vs.voc, data = pheno) 
-summary(glm.sv2)
-glm.sv3 <- glm(sv3 ~ CD71_libprep_batch + Sex + steadyState.vs.voc, data = pheno) 
-summary(glm.sv3)
-coef(summary(glm.sv1))[,4]
 
-######### PVCA including surrogate variables
+# Fit a generalized linear model for to see what metadata features are associated
+# with the surrogate variables. 
+# FIX: Automate removal of surrogate variables associated with metadata feature of interest
+# from downstream analysis
+glm.sv1 <- glm(sv1 ~ CD71_libprep_batch + Sex + steadyState.vs.voc, data = pheno) 
+#summary(glm.sv1)
+coef(summary(glm.sv1))[,4]
+# glm.sv2 <- glm(sv2 ~ CD71_libprep_batch + Sex + steadyState.vs.voc, data = pheno) 
+# summary(glm.sv2)
+# glm.sv3 <- glm(sv3 ~ CD71_libprep_batch + Sex + steadyState.vs.voc, data = pheno) 
+# summary(glm.sv3)
+
+
+############### PVCA including surrogate variables ##########################
 #pheno2 <- pheno
 #pheno <- pheno2
 
-# conTocat requires two things in the list.
+# Make surrogate variables categorical which is necessary for PVCA
+# conTocat requires minimum of two elements in the list, so when there is only
+# one surrogate variable, it can be added twice to the list and removed from the 
+# metadata later.
 # Tried to use it on inpData, but wouldn't allow duplicate columns.
 # Instead used on pheno, which was then used to make inpData variable
 #var_names <- c("sv1", "sv2", "sv3")
 var_names <- c("sv1", "sv1")
 pheno<-conTocat(pheno, var_names)
 
-#Only use when 1 SV
+# Only use when there is one surrogate variable; it will remove the extra column
+# that was added.
 pheno <- pheno[,-ncol(pheno)]
 pd2 <- new("AnnotatedDataFrame", data = pheno)
 inpData <- ExpressionSet(assayData = gct, phenoData = pd2)
@@ -184,8 +193,8 @@ gibPlot2 <- pvcAnaly(inpData, pct_threshold, covariates) # Residual: 0.752 > 0.7
 # cvrts_eff_var <- c("Subject_ID","CD71_libprep_batch","Sex","baseline.vs.voc", "sv1")
 # pvcAnaly(inpData, pct_threshold, cvrts_eff_var)
 
-
-############## SNM Analysis #############################
+############################### SNM Analysis #####################################
+# Create model matrices for the biological variables of interest and adjustment variables
 # Extract the surrogate variables from the 'sv' object
 sv_vars = sva.out$sv
 
@@ -220,7 +229,7 @@ deg <- deg[order(deg$qval),]
 
 number_of_DEG <- 3778
 
-### Print top DEGs
+### Print top DEGs 
 # Below bonferroni threshold
 # bonferroni_cutoff <- .05/nrow(gct)
 # counter <- 0 
@@ -236,5 +245,5 @@ number_of_DEG <- 3778
 #   cat(deg$gene[i], "\n")
 # }
 top_found_genes <- deg[1:number_of_DEG,"gene"]
-write.table(top_found_genes, file = "found_genes_12k_1e-04.txt", row.names = F, col.names = F, quote = F)
+#write.table(top_found_genes, file = "found_genes_12k_1e-04.txt", row.names = F, col.names = F, quote = F)
   
